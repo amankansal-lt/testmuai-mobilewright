@@ -29,6 +29,13 @@ export class WebDriverClient {
   constructor(
     private readonly hubUrl: string,
     private readonly commandTimeout = DEFAULT_COMMAND_TIMEOUT,
+    /**
+     * Extra headers attached to every command. Used to label each WebDriver
+     * call with the Mobilewright verb it came from: the hub otherwise sees only
+     * `GET /source` and `POST /actions` and cannot tell which framework call
+     * produced them.
+     */
+    private readonly extraHeaders?: () => Record<string, string> | undefined,
   ) {}
 
   async newSession(capabilities: unknown, timeoutMs?: number): Promise<{ sessionId: string; capabilities: Record<string, unknown> }> {
@@ -101,7 +108,7 @@ export class WebDriverClient {
     try {
       response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        headers: { 'Content-Type': 'application/json; charset=utf-8', ...this.extraHeaders?.() },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
         signal: AbortSignal.timeout(timeoutMs),
       });

@@ -53,6 +53,9 @@ const DEFAULT_ALLOCATION_TIMEOUT = 900_000;
 const DEFAULT_IDLE_TIMEOUT = 900;
 const DEFAULT_SNAPSHOT_TUNING: SnapshotTuning = { waitForIdleTimeout: 0, animationCoolOffTimeout: 0 };
 
+/** Labels each WebDriver command with the Mobilewright verb behind it. */
+const STEP_HEADER = 'X-LT-Framework-Step';
+
 // LambdaTest session ids are long hex/uuid-ish strings; a catalog device name never is.
 const SESSION_ID_RE = /^[0-9a-f][0-9a-f-]{19,}$/i;
 
@@ -98,13 +101,18 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
   private readonly allocatedSessions = new Set<string>();
   private readonly appCache = new Map<string, Promise<string>>();
   private session: ActiveSession | null = null;
+  private step: string | undefined;
   private api: LambdaTestApi | undefined;
   private planConcurrency: number | undefined;
   private concurrencyWarned = false;
 
   constructor(options: LambdaTestDriverOptions = {}) {
     this.options = { build: detectBuildName(), ...options };
-    this.hub = new WebDriverClient(options.hubUrl ?? DEFAULT_HUB_URL, options.commandTimeout);
+    this.hub = new WebDriverClient(
+      options.hubUrl ?? DEFAULT_HUB_URL,
+      options.commandTimeout,
+      () => (this.step && options.stepHeader !== false ? { [STEP_HEADER]: this.step } : undefined),
+    );
     this.keepalive = new Keepalive(this.hub);
     this.observer = options.testResults === false
       ? undefined
@@ -312,16 +320,35 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
   // ─── UI hierarchy ───────────────────────────────────────────
 
   async getViewHierarchy(): Promise<ViewNode[]> {
-    const { sessionId, platform } = await this.nativeSession();
-    const xml = await this.hub.source(sessionId);
-    return parseSourceXml(xml, platform, this.options.visibility ?? 'native');
+    return this.stepped('getViewHierarchy', async () => {
+      const { sessionId, platform } = await this.nativeSession();
+      const xml = await this.hub.source(sessionId);
+      return parseSourceXml(xml, platform, this.options.visibility ?? 'native');
+    });
+  }
+
+  /**
+   * Labels every hub command raised inside `fn` with the verb that caused it.
+   * The hub only ever sees `GET /source` and `POST /actions`; without this it
+   * cannot tell that one locator tap produced three of them.
+   */
+  private async stepped<T>(name: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.step;
+    this.step = name;
+    try {
+      return await fn();
+    } finally {
+      this.step = previous;
+    }
   }
 
   // ─── Input ──────────────────────────────────────────────────
 
   async tap(x: number, y: number): Promise<void> {
-    const { sessionId } = await this.nativeSession();
-    await this.hub.performActions(sessionId, tapActions(x, y));
+    return this.stepped('tap', async () => {
+      const { sessionId } = await this.nativeSession();
+      await this.hub.performActions(sessionId, tapActions(x, y));
+    });
   }
 
   async doubleTap(x: number, y: number): Promise<void> {

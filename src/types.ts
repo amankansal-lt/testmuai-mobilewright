@@ -107,6 +107,13 @@ export interface LambdaTestDriverOptions {
    */
   visibility?: 'native' | 'bounds';
 
+  /**
+   * Send the X-LT-Framework-Step header naming the Mobilewright verb behind
+   * each WebDriver command, so the dashboard's command log can be read as
+   * framework calls rather than raw `GET /source` traffic. Default: true.
+   */
+  stepHeader?: boolean;
+
   /** Escape hatches merged last. */
   capabilities?: Record<string, unknown>;
   ltOptions?: Record<string, unknown>;
