@@ -1,16 +1,3 @@
-export type NetworkProfile = '2G' | '3G' | '4G' | 'wifi' | 'edge' | 'offline';
-
-export interface NetworkThrottle {
-  /** kbps */
-  download: number;
-  /** kbps */
-  upload: number;
-  /** ms */
-  latency: number;
-  /** 0–100 */
-  loss?: number;
-}
-
 export interface SnapshotTuning {
   /**
    * Stop XCUITest/UiAutomator2 waiting for the app to go quiescent before each
@@ -43,16 +30,12 @@ export interface TestMuDriverOptions {
 
   /** Override the Appium hub. Set this to point at a local Appium for development. */
   hubUrl?: string;
-  /** Override the REST API host. */
-  apiUrl?: string;
 
   build?: string;
   project?: string;
   name?: string;
   tags?: string[];
 
-  /** One session, video and verdict per test instead of one per worker slot. */
-  sessionPerTest?: boolean;
   /** Push pass/fail to the dashboard. Default: true. */
   testResults?: boolean;
 
@@ -77,7 +60,7 @@ export interface TestMuDriverOptions {
   tunnel?: boolean;
   tunnelName?: string;
   geoLocation?: string;
-  network?: NetworkProfile | NetworkThrottle;
+  /** Capture network logs for the session (the `network` capability). */
   networkLog?: boolean;
   deviceLog?: boolean;
   video?: boolean;

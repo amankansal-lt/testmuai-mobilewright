@@ -64,7 +64,11 @@ export function toTestMuPlatformVersion(osVersion: string | undefined): string |
   const max = range.max ? Math.floor(Number(range.max.version)) : undefined;
   if (min === undefined && max === undefined) return undefined;
 
-  const lower = min ?? Math.max(0, (max ?? 0) - 6);
+  // A half-open range has to be approximated as a finite list of majors. The
+  // window is generous on purpose: too narrow silently excludes a current OS
+  // (">=17" must still admit iOS 26), and over-inclusion only widens matching.
+  const WINDOW = 11;
+  const lower = min ?? Math.max(0, (max ?? 0) - WINDOW);
   // An exclusive bound on a whole major excludes that major entirely
   // (">=17 <19" admits 17.x and 18.x, never 19.x). An exclusive bound with
   // minors still admits the earlier minors of that major ("<19.5" admits
@@ -73,9 +77,9 @@ export function toTestMuPlatformVersion(osVersion: string | undefined): string |
   const excludesWholeMajor = range.max !== undefined &&
     !range.max.inclusive &&
     /^\d+(\.0+)*$/.test(range.max.version);
-  const upper = max === undefined ? lower + 6 : (excludesWholeMajor ? max - 1 : max);
+  const upper = max === undefined ? lower + WINDOW : (excludesWholeMajor ? max - 1 : max);
   const majors: string[] = [];
-  for (let v = lower; v <= upper && majors.length < 12; v++) majors.push(`${v}.*`);
+  for (let v = lower; v <= upper && majors.length <= WINDOW + 1; v++) majors.push(`${v}.*`);
   if (majors.length === 0) return undefined;
   return `(${majors.join('),(')})`;
 }

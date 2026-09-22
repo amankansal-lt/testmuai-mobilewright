@@ -61,12 +61,11 @@ straight through, and an `osVersion` range becomes a major-version alternation.
 | `app` / `apps` | `TESTMU_APP`, else `LT_APP` | `lt://APP_ID`, local `.apk`/`.ipa` (uploaded once per run, cached by content hash), or https url. `apps` is keyed `ios`/`android`/`ios-real`/`android-real`; an array installs helper apps as `otherApps` (max 3) |
 | `username` / `accessKey` | `TESTMU_USERNAME` / `TESTMU_ACCESS_KEY`, falling back to `LT_USERNAME` / `LT_ACCESS_KEY` | |
 | `build` / `project` / `name` / `tags` | build auto-detected from CI | GitHub Actions, GitLab, CircleCI, Buildkite, Bitrise, Azure, Jenkins, TeamCity |
-| `sessionPerTest` | `false` | one session, video and verdict per test |
 | `idleTimeout` | `900` | raised from TestMu.Ai's 120s default because a pooled slot idles between tests; paired with a 45s keepalive ping |
 | `allocationTimeout` | `900000` | covers TestMu.Ai's own device queue |
 | `snapshotTuning` | `{ waitForIdleTimeout: 0, animationCoolOffTimeout: 0 }` | see below; `false` leaves server defaults |
 | `visibility` | `'native'` | `'bounds'` matches mobilecli's looser semantics — see below |
-| `tunnel` / `tunnelName`, `geoLocation`, `timezone`, `networkLog`, `deviceLog`, `video`, `disableAnimation`, `autoGrantPermissions`, `autoAcceptAlerts`, `autoDismissAlerts`, `appiumVersion`, `region`, `queueTimeout`, `maxDuration` | | mapped to TestMu.Ai capabilities |
+| `tunnel` / `tunnelName`, `geoLocation`, `timezone`, `networkLog`, `deviceLog`, `video`, `disableAnimation`, `autoGrantPermissions`, `autoAcceptAlerts`, `autoDismissAlerts`, `appiumVersion`, `region`, `queueTimeout`, `maxDuration` | | mapped to TestMu.Ai capabilities. Network throttling is available through the `capabilities` escape hatch |
 | `capabilities` / `ltOptions` | | escape hatches, merged last |
 | `hubUrl` / `apiBase` / `uploadUrl` | TestMu.Ai | point `hubUrl` at a local Appium for development |
 
@@ -99,14 +98,16 @@ of this package.
 
 The driver ships a `TestObserver`, so Mobilewright wires up session naming and pass/fail with
 no reporter configuration. The verdict is pushed while the session is still alive (at release),
-via `lambda-hook: setTestStatus` with `lambda-status=` and the REST API as fallbacks. A pooled
-session that hosted several tests is reported with a run summary (`11/12 tests passed`);
-`sessionPerTest: true` gives each test its own named session.
+at the end of the run, from the run report: each session is judged **only by the tests that
+actually ran on it** (matched through the `device.id` annotation the fixture attaches), and a
+test counts as its final attempt, so a flaky-then-passed retry does not fail a session. The
+push goes through `lambda-hook: setTestStatus`, then `lambda-status=`, then the REST API —
+sessions are usually already released by run end, which is what the REST fallback is for.
 
 ## Development
 
 ```bash
-npm run build && npm run typecheck && npm test      # 33 unit tests, no device needed
+npm run build && npm run typecheck && npm test      # 40 unit tests, no device needed
 ```
 
 To exercise it against real hardware without TestMu.Ai credentials, point `hubUrl` at a local

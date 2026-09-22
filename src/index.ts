@@ -6,7 +6,7 @@ export { TestMuObserver } from './observer.js';
 export { parseSourceXml } from './parse-source.js';
 export { cropPng } from './png-crop.js';
 export { TestMuDriverError, WebDriverError } from './errors.js';
-export type { TestMuDriverOptions, NetworkProfile, NetworkThrottle, SnapshotTuning } from './types.js';
+export type { TestMuDriverOptions, SnapshotTuning } from './types.js';
 
 /**
  * Config-file spelling of `new TestMuDriver(options)`:

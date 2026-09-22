@@ -13,15 +13,26 @@ const NAMED_ENTITIES: Record<string, string> = {
   '&apos;': "'",
 };
 
+function codePoint(value: number): string | undefined {
+  // An app can render an out-of-range numeric entity; fromCodePoint throws on
+  // one, which would otherwise escape parseSourceXml and fail every poll.
+  if (!Number.isInteger(value) || value < 0 || value > 0x10ffff) return undefined;
+  try {
+    return String.fromCodePoint(value);
+  } catch {
+    return undefined;
+  }
+}
+
 function decodeEntities(raw: string): string {
   if (!raw.includes('&')) return raw;
   return raw.replace(/&(?:amp|lt|gt|quot|apos|#x?[0-9a-fA-F]+);/g, (entity) => {
     const named = NAMED_ENTITIES[entity];
     if (named) return named;
     const hex = /^&#x([0-9a-fA-F]+);$/.exec(entity);
-    if (hex) return String.fromCodePoint(parseInt(hex[1], 16));
+    if (hex) return codePoint(parseInt(hex[1], 16)) ?? entity;
     const dec = /^&#(\d+);$/.exec(entity);
-    if (dec) return String.fromCodePoint(parseInt(dec[1], 10));
+    if (dec) return codePoint(parseInt(dec[1], 10)) ?? entity;
     return entity;
   });
 }
@@ -146,10 +157,17 @@ export function parseSourceXml(xml: string, platform: Platform, visibility: Visi
     ? (tag: string, attrs: Record<string, string>) => androidNode(tag, attrs)
     : (tag: string, attrs: Record<string, string>) => iosNode(tag, attrs, visibility);
 
+  // Comments and CDATA can contain tag-shaped text. Without stripping them a
+  // commented-out element becomes a real ViewNode with real bounds, which a
+  // locator can match and tap — an element that is not on screen at all.
+  const scannable = xml
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '');
+
   const tagRe = /<(\/?)([A-Za-z_][\w.$:-]*)((?:"[^"]*"|[^>])*)>/g;
   let match: RegExpExecArray | null;
 
-  while ((match = tagRe.exec(xml)) !== null) {
+  while ((match = tagRe.exec(scannable)) !== null) {
     const [, closing, tag, attrsRaw] = match;
 
     if (closing) {

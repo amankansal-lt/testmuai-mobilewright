@@ -30,6 +30,7 @@ import { NoDeviceAvailableError } from '@mobilewright/protocol';
 import { appsForCriteria, buildCapabilities, resolveCredentials, type Credentials } from './capabilities.js';
 import { TestMuApi } from './rest.js';
 import { detectBuildName } from './ci.js';
+import { envValue } from './env.js';
 import { TestMuDriverError, WebDriverError } from './errors.js';
 import { Keepalive } from './keepalive.js';
 import { TestMuObserver } from './observer.js';
@@ -138,7 +139,7 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
           setSessionStatus: (id, passed, reason) => this.setSessionStatus(id, passed, reason),
           setSessionName: (id, name) => this.setSessionName(id, name),
         },
-        { ...(options.sessionPerTest !== undefined && { sessionPerTest: options.sessionPerTest }), ...(options.name !== undefined && { name: options.name }) },
+        { ...(options.name !== undefined && { name: options.name }) },
       );
   }
 
@@ -245,13 +246,13 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   async release(deviceId: string): Promise<void> {
     this.keepalive.stop(deviceId);
     this.allocatedSessions.delete(deviceId);
-    // Deleting the session ends it, and the executor hooks only reach a live
-    // one — so this is the last chance to put a verdict on the dashboard.
-    const verdict = (this.observer as TestMuObserver | undefined)?.verdict?.();
-    if (verdict) {
-      if (verdict.name) await this.setSessionName(deviceId, verdict.name);
-      await this.setSessionStatus(deviceId, verdict.passed, verdict.reason);
+    // A session this instance is driving is now gone; drop the handle so a
+    // later verb fails with "no active session" instead of "invalid session id".
+    if (this.session?.sessionId === deviceId) {
+      this.session = null;
     }
+    // Verdicts are pushed per session by the observer at run end, from the run
+    // report. Pushing here would stamp one worker's outcome on every session.
     try {
       await this.hub.deleteSession(deviceId);
     } catch (err) {
@@ -432,7 +433,13 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
     const current = await this.focusedValueLength();
     if (current > 0) {
       await this.hub.performActions(sessionId, [typeTextActions(''.repeat(current))]);
+      return;
     }
+    // No focused element and nothing to count: the select-all chord is the last
+    // resort. Returning silently here would let fill() append to existing text
+    // while reporting success.
+    debug('clearText: no focused element; falling back to the select-all chord');
+    await this.pressKeys([platform === 'ios' ? 'cmd+a' : 'ctrl+a', 'backspace']);
   }
 
   private async focusedValueLength(): Promise<number> {
@@ -540,7 +547,10 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   }
 
   async getScreenSize(): Promise<ScreenSize> {
-    const session = this.require();
+    // Native context matters: inside a webview /window/rect returns the page
+    // viewport, and caching that would corrupt every later swipe coordinate
+    // and screenshot crop for the rest of the session.
+    const session = await this.nativeSession();
     if (session.screenSize) return session.screenSize;
 
     const rect = await this.hub.get<{ width: number; height: number }>(session.sessionId, '/window/rect');
@@ -633,7 +643,11 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   async installApp(pathOrRef: string): Promise<void> {
     // The session started with this app, so the fixture's install pass would
     // reinstall the same build for nothing.
-    const configured = [this.options.app, ...Object.values(this.options.apps ?? {}).flat()];
+    const configured = [
+      this.options.app,
+      envValue('APP'),
+      ...Object.values(this.options.apps ?? {}).flat(),
+    ];
     if (configured.includes(pathOrRef)) {
       debug('installApp(%s) skipped — already the session app', pathOrRef);
       return;
@@ -666,6 +680,12 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
 
   async openUrl(url: string): Promise<void> {
     const { sessionId, platform, lastLaunchedBundleId } = await this.nativeSession();
+    if (!lastLaunchedBundleId) {
+      // `mobile: deepLink` requires the target app; before the first launchApp
+      // we do not know it, and W3C /url opens a deep link without one.
+      await this.hub.post(sessionId, '/url', { url });
+      return;
+    }
     await this.hub.mobile(sessionId, 'deepLink', {
       url,
       ...(platform === 'android' ? { package: lastLaunchedBundleId } : { bundleId: lastLaunchedBundleId }),
