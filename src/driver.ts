@@ -131,8 +131,14 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
     return resolveCredentials(this.options, this.isLambdaTestHub);
   }
 
+  /**
+   * Whether the hub is a LambdaTest one, which decides the capability style and
+   * whether credentials are mandatory. Devcluster hubs are
+   * `mobile-hub-<name>-dev.lambdatestinternal.com`, so both domains count.
+   */
   private get isLambdaTestHub(): boolean {
-    return (this.options.hubUrl ?? DEFAULT_HUB_URL).includes('lambdatest.com');
+    if (this.options.capabilityStyle) return this.options.capabilityStyle === 'lambdatest';
+    return /lambdatest(internal)?\.com/i.test(this.options.hubUrl ?? DEFAULT_HUB_URL);
   }
 
   /** REST client for uploads, concurrency and post-session status. */
@@ -744,6 +750,13 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
       debug('lambda-name failed (%s), trying the REST API', (err as Error).message);
     }
     await this.rest?.updateSession(sessionId, { name }).catch(() => {});
+  }
+
+  /** Test seam: the capabilities this driver would send for a given allocation. */
+  buildCapabilitiesForTest(criteria: AllocationCriteria): Record<string, unknown> {
+    return buildCapabilities(criteria, this.optionsWithDefaults(), [], this.credentials, {
+      style: this.isLambdaTestHub ? 'lambdatest' : 'w3c',
+    }).alwaysMatch;
   }
 
   get activeSessionId(): string | undefined {

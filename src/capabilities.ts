@@ -3,6 +3,9 @@ import { parseOsVersion } from '@mobilewright/protocol';
 import { LambdaTestDriverError } from './errors.js';
 import type { LambdaTestDriverOptions } from './types.js';
 
+/** Dashboard label for sessions this driver creates. */
+export const FRAMEWORK_TYPE = 'mobilewright';
+
 export interface Credentials {
   username: string;
   accessKey: string;
@@ -119,6 +122,9 @@ export function buildCapabilities(
     automationName,
     isRealMobile: true,
     w3c: true,
+    // Labels the session on the dashboard. The session itself is an ordinary
+    // Appium one — this only says which client framework drove it.
+    frameworkType: FRAMEWORK_TYPE,
     ...(deviceName ? { deviceName } : {}),
     ...(platformVersion ? { platformVersion } : {}),
     ...(app ? { app } : {}),

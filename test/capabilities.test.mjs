@@ -28,6 +28,12 @@ test('LambdaTest capabilities are flat, not nested under lt:options', () => {
   assert.equal(caps.build, 'ci-1');
 });
 
+test('sessions are labelled with the mobilewright framework type', () => {
+  assert.equal(lt({ platform: 'ios' }).frameworkType, 'mobilewright');
+  // still overridable through the escape hatch
+  assert.equal(lt({ platform: 'ios' }, { ltOptions: { frameworkType: 'appium' } }).frameworkType, 'appium');
+});
+
 test('LambdaTest log capabilities use their documented spelling', () => {
   const caps = lt({ platform: 'android' }, { deviceLog: true, networkLog: true, video: false });
   assert.equal(caps.devicelog, true);

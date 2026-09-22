@@ -105,3 +105,25 @@ test('a standalone connect creates its own session and releases it', async () =>
     await hub.close();
   }
 });
+
+test('devcluster hubs are recognised as LambdaTest hubs', async () => {
+  const hub = await startHub();
+  // lambdatestinternal.com is the devcluster domain; a plain Appium host is not.
+  const dev = new LambdaTestDriver({
+    hubUrl: `http://mobile-hub-demo-dev.lambdatestinternal.com:${hub.port}/wd/hub`,
+    username: 'u',
+    accessKey: 'k',
+  });
+  const caps = dev.buildCapabilitiesForTest({ platform: 'ios' });
+  assert.equal(caps.isRealMobile, true, 'devcluster hub must use LambdaTest capability style');
+  assert.equal(caps.frameworkType, 'mobilewright');
+
+  const plain = new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
+  assert.equal(plain.buildCapabilitiesForTest({ platform: 'ios' }).isRealMobile, undefined);
+
+  // explicit override wins over the hostname
+  const forced = new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${hub.port}`, capabilityStyle: 'lambdatest', username: 'u', accessKey: 'k' });
+  assert.equal(forced.buildCapabilitiesForTest({ platform: 'ios' }).isRealMobile, true);
+
+  await hub.close();
+});

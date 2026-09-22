@@ -114,6 +114,13 @@ export interface LambdaTestDriverOptions {
    */
   stepHeader?: boolean;
 
+  /**
+   * Force the capability style instead of inferring it from `hubUrl`.
+   * 'lambdatest' sends LambdaTest's flat capabilities; 'w3c' sends prefixed
+   * vendor capabilities for a plain Appium server.
+   */
+  capabilityStyle?: 'lambdatest' | 'w3c';
+
   /** Escape hatches merged last. */
   capabilities?: Record<string, unknown>;
   ltOptions?: Record<string, unknown>;
