@@ -2,10 +2,6 @@
   "name": "@testmuai/mobilewright",
   "version": "0.1.0",
   "description": "TestMu.Ai driver for Mobilewright \u2014 run Mobilewright tests on TestMu.Ai real devices",
-  "main": "./dist/index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "keywords": [
     "mobilewright",
     "testmu",
@@ -18,23 +14,43 @@
     "ios",
     "android"
   ],
-  "author": "",
   "license": "Apache-2.0",
-  "type": "module",
-  "devDependencies": {
-    "@mobilewright/core": "^0.0.60",
-    "@mobilewright/protocol": "^0.0.60",
-    "@types/debug": "^4.1.13",
-    "@types/node": "^26.6.2",
-    "typescript": "^7.0.2"
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amankansal-lt/testmuai-mobilewright.git"
   },
-  "dependencies": {
-    "debug": "^4.4.3"
+  "homepage": "https://github.com/amankansal-lt/testmuai-mobilewright#readme",
+  "bugs": {
+    "url": "https://github.com/amankansal-lt/testmuai-mobilewright/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test --test-timeout 30000 test/*.test.mjs",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+  },
   "peerDependencies": {
     "@mobilewright/protocol": ">=0.0.56 <0.1.0"
   },
@@ -42,5 +58,15 @@
     "@mobilewright/protocol": {
       "optional": false
     }
+  },
+  "dependencies": {
+    "debug": "^4.4.3"
+  },
+  "devDependencies": {
+    "@mobilewright/core": "^0.0.60",
+    "@mobilewright/protocol": "^0.0.60",
+    "@types/debug": "^4.1.13",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
   }
 }
