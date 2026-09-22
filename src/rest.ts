@@ -2,10 +2,10 @@ import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { basename } from 'node:path';
 import createDebug from 'debug';
-import { LambdaTestDriverError } from './errors.js';
+import { TestMuDriverError } from './errors.js';
 import type { Credentials } from './capabilities.js';
 
-const debug = createDebug('lambdatest:rest');
+const debug = createDebug('testmu:rest');
 
 export const DEFAULT_API_URL = 'https://mobile-api.lambdatest.com/mobile-automation/api/v1';
 export const DEFAULT_UPLOAD_URL = 'https://manual-api.lambdatest.com/app/upload/realDevice';
@@ -20,7 +20,7 @@ export interface Concurrency {
   running: number;
 }
 
-export class LambdaTestApi {
+export class TestMuApi {
   private readonly authHeader: string;
 
   constructor(
@@ -100,12 +100,12 @@ export class LambdaTestApi {
 
     const text = await response.text();
     if (!response.ok) {
-      throw new LambdaTestDriverError(`App upload failed (${response.status}): ${text.slice(0, 400)}`);
+      throw new TestMuDriverError(`App upload failed (${response.status}): ${text.slice(0, 400)}`);
     }
     const body = JSON.parse(text) as { app_url?: string; app_id?: string };
     const appUrl = body.app_url ?? (body.app_id ? `lt://${body.app_id}` : undefined);
     if (!appUrl) {
-      throw new LambdaTestDriverError(`App upload response carried no app_url: ${text.slice(0, 400)}`);
+      throw new TestMuDriverError(`App upload response carried no app_url: ${text.slice(0, 400)}`);
     }
     debug('uploaded %s -> %s', name, appUrl);
     return appUrl;
@@ -123,7 +123,7 @@ export class LambdaTestApi {
     });
     const text = await response.text();
     if (!response.ok) {
-      throw new LambdaTestDriverError(`${method} ${path} failed (${response.status}): ${text.slice(0, 300)}`);
+      throw new TestMuDriverError(`${method} ${path} failed (${response.status}): ${text.slice(0, 300)}`);
     }
     return (text ? JSON.parse(text) : {}) as T;
   }
@@ -133,7 +133,7 @@ export class LambdaTestApi {
 async function fileKey(path: string): Promise<string> {
   const info = await stat(path).catch(() => undefined);
   if (!info) {
-    throw new LambdaTestDriverError(`App file not found: ${path}`);
+    throw new TestMuDriverError(`App file not found: ${path}`);
   }
   if (info.size > 64 * 1024 * 1024) {
     return `${path}:${info.size}:${info.mtimeMs}`;

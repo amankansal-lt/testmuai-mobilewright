@@ -4,8 +4,8 @@ import {
   appsForCriteria,
   buildCapabilities,
   resolveCredentials,
-  toLambdaTestDeviceName,
-  toLambdaTestPlatformVersion,
+  toTestMuDeviceName,
+  toTestMuPlatformVersion,
 } from '../dist/capabilities.js';
 
 const creds = { username: 'user', accessKey: 'key' };
@@ -15,7 +15,7 @@ test('platform is required', () => {
   assert.throws(() => lt({}), /platform \("ios" or "android"\) is required/);
 });
 
-test('LambdaTest capabilities are flat, not nested under lt:options', () => {
+test('TestMu.Ai capabilities are flat, not nested under lt:options', () => {
   const caps = lt({ platform: 'ios' }, { build: 'ci-1' }, ['lt://APP1']);
   assert.equal(caps['lt:options'], undefined);
   assert.equal(caps.platformName, 'iOS');
@@ -40,7 +40,7 @@ test('a session without an app fails fast rather than allocating as web automati
   assert.doesNotThrow(() => buildCapabilities({ platform: 'ios' }, { capabilities: { app: 'lt://X' } }, [], creds));
 });
 
-test('LambdaTest log capabilities use their documented spelling', () => {
+test('TestMu.Ai log capabilities use their documented spelling', () => {
   const caps = lt({ platform: 'android' }, { deviceLog: true, networkLog: true, video: false });
   assert.equal(caps.devicelog, true);
   assert.equal(caps.network, true);
@@ -57,18 +57,18 @@ test('w3c style prefixes vendor capabilities for a standard Appium server', () =
   assert.equal(caps.user, undefined);
 });
 
-test('device name patterns become LambdaTest regexes, literals pass through', () => {
-  assert.equal(toLambdaTestDeviceName('iPhone 14 Pro'), 'iPhone 14 Pro');
-  assert.equal(toLambdaTestDeviceName('iPhone 1[45]'), '(iPhone 1[45].*)');
-  assert.equal(toLambdaTestDeviceName(undefined), undefined);
+test('device name patterns become TestMu.Ai regexes, literals pass through', () => {
+  assert.equal(toTestMuDeviceName('iPhone 14 Pro'), 'iPhone 14 Pro');
+  assert.equal(toTestMuDeviceName('iPhone 1[45]'), '(iPhone 1[45].*)');
+  assert.equal(toTestMuDeviceName(undefined), undefined);
   assert.equal(lt({ platform: 'ios', deviceNamePattern: 'Pixel.*' }).deviceName, '(Pixel.*.*)');
 });
 
 test('osVersion ranges translate to a major-version alternation', () => {
-  assert.equal(toLambdaTestPlatformVersion('17.2'), '17.2');
-  assert.equal(toLambdaTestPlatformVersion('17'), '17');
-  assert.equal(toLambdaTestPlatformVersion('>=17 <19'), '(17.*),(18.*),(19.*)');
-  assert.equal(toLambdaTestPlatformVersion(undefined), undefined);
+  assert.equal(toTestMuPlatformVersion('17.2'), '17.2');
+  assert.equal(toTestMuPlatformVersion('17'), '17');
+  assert.equal(toTestMuPlatformVersion('>=17 <19'), '(17.*),(18.*),(19.*)');
+  assert.equal(toTestMuPlatformVersion(undefined), undefined);
 });
 
 test('helper apps become otherApps, deduped and capped at three', () => {

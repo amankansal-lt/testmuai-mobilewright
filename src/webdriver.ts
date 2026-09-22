@@ -1,7 +1,7 @@
 import createDebug from 'debug';
 import { WebDriverError } from './errors.js';
 
-const debug = createDebug('lambdatest:wd');
+const debug = createDebug('testmu:wd');
 
 const W3C_ELEMENT_KEY = 'element-6066-11e4-a52e-4f735466cecf';
 const JSONWP_ELEMENT_KEY = 'ELEMENT';
@@ -66,7 +66,7 @@ export class WebDriverClient {
     return this.cmd<T>('POST', sessionId, path, body, timeoutMs);
   }
 
-  /** POST /execute/sync — carries both `mobile:` commands and LambdaTest executor payloads. */
+  /** POST /execute/sync — carries both `mobile:` commands and TestMu.Ai executor payloads. */
   executeScript<T = unknown>(sessionId: string, script: string, args: unknown[] = []): Promise<T> {
     return this.post<T>(sessionId, '/execute/sync', { script, args });
   }

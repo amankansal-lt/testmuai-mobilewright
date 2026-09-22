@@ -14,9 +14,9 @@ export class WebDriverError extends Error {
   }
 }
 
-export class LambdaTestDriverError extends Error {
+export class TestMuDriverError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'LambdaTestDriverError';
+    this.name = 'TestMuDriverError';
   }
 }

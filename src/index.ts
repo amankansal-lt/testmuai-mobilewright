@@ -1,25 +1,25 @@
-import { LambdaTestDriver } from './driver.js';
-import type { LambdaTestDriverOptions } from './types.js';
+import { TestMuDriver } from './driver.js';
+import type { TestMuDriverOptions } from './types.js';
 
-export { LambdaTestDriver, DEFAULT_HUB_URL } from './driver.js';
-export { LambdaTestObserver } from './observer.js';
+export { TestMuDriver, DEFAULT_HUB_URL } from './driver.js';
+export { TestMuObserver } from './observer.js';
 export { parseSourceXml } from './parse-source.js';
 export { cropPng } from './png-crop.js';
-export { LambdaTestDriverError, WebDriverError } from './errors.js';
-export type { LambdaTestDriverOptions, NetworkProfile, NetworkThrottle, SnapshotTuning } from './types.js';
+export { TestMuDriverError, WebDriverError } from './errors.js';
+export type { TestMuDriverOptions, NetworkProfile, NetworkThrottle, SnapshotTuning } from './types.js';
 
 /**
- * Config-file spelling of `new LambdaTestDriver(options)`:
+ * Config-file spelling of `new TestMuDriver(options)`:
  *
  *   import { defineConfig } from 'mobilewright';
- *   import { lambdaTestDriver } from '@lambdatest/mobilewright';
+ *   import { testMuDriver } from '@testmuai/mobilewright';
  *
  *   export default defineConfig({
  *     bundleId: 'com.example.app',
- *     driver: lambdaTestDriver({ app: 'lt://APP_ID' }),
+ *     driver: testMuDriver({ app: 'lt://APP_ID' }),
  *     projects: [{ name: 'ios', use: { platform: 'ios', deviceType: 'real' } }],
  *   });
  */
-export function lambdaTestDriver(options: LambdaTestDriverOptions = {}): LambdaTestDriver {
-  return new LambdaTestDriver(options);
+export function testMuDriver(options: TestMuDriverOptions = {}): TestMuDriver {
+  return new TestMuDriver(options);
 }

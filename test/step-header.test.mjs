@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { LambdaTestDriver } from '../dist/driver.js';
+import { TestMuDriver } from '../dist/driver.js';
 
 const SESSION_ID = '0123456789abcdef0123';
 
@@ -39,7 +39,7 @@ async function startHub() {
 
 test('each command is labelled with the Mobilewright verb behind it', async () => {
   const hub = await startHub();
-  const driver = new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
+  const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
 
   await driver.connect({ platform: 'ios', deviceId: SESSION_ID });
   await driver.getViewHierarchy();
@@ -59,13 +59,13 @@ test('each command is labelled with the Mobilewright verb behind it', async () =
 
 test('snapshot tuning is applied on connect and can be disabled', async () => {
   const on = await startHub();
-  await new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${on.port}` }).connect({ platform: 'ios', deviceId: SESSION_ID });
+  await new TestMuDriver({ hubUrl: `http://127.0.0.1:${on.port}` }).connect({ platform: 'ios', deviceId: SESSION_ID });
   const applied = on.seen.find((r) => r.path.endsWith('/appium/settings'));
   assert.deepEqual(JSON.parse(applied.body).settings, { waitForIdleTimeout: 0, animationCoolOffTimeout: 0 });
   await on.close();
 
   const off = await startHub();
-  await new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${off.port}`, snapshotTuning: false })
+  await new TestMuDriver({ hubUrl: `http://127.0.0.1:${off.port}`, snapshotTuning: false })
     .connect({ platform: 'ios', deviceId: SESSION_ID });
   assert.equal(off.seen.find((r) => r.path.endsWith('/appium/settings')), undefined);
   await off.close();
@@ -73,7 +73,7 @@ test('snapshot tuning is applied on connect and can be disabled', async () => {
 
 test('the page source is parsed into ViewNodes end to end', async () => {
   const hub = await startHub();
-  const driver = new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
+  const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
   await driver.connect({ platform: 'ios', deviceId: SESSION_ID });
 
   const [node] = await driver.getViewHierarchy();
@@ -87,9 +87,9 @@ test('the page source is parsed into ViewNodes end to end', async () => {
 
 test('a standalone connect creates its own session and releases it', async () => {
   const hub = await startHub();
-  const driver = new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
+  const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
   try {
-    // A pattern with metacharacters becomes a LambdaTest regex; a literal name
+    // A pattern with metacharacters becomes a TestMu.Ai regex; a literal name
     // is sent as-is.
     const session = await driver.connect({ platform: 'ios', deviceName: /iPhone 1[45]/ });
     assert.equal(session.deviceId, SESSION_ID);
@@ -106,23 +106,23 @@ test('a standalone connect creates its own session and releases it', async () =>
   }
 });
 
-test('devcluster hubs are recognised as LambdaTest hubs', async () => {
+test('devcluster hubs are recognised as TestMu.Ai hubs', async () => {
   const hub = await startHub();
-  // lambdatestinternal.com is the devcluster domain; a plain Appium host is not.
-  const dev = new LambdaTestDriver({
-    hubUrl: `http://mobile-hub-demo-dev.lambdatestinternal.com:${hub.port}/wd/hub`,
+  // A cluster hub is matched by its `mobile-hub` service name; a plain Appium host is not.
+  const dev = new TestMuDriver({
+    hubUrl: `http://mobile-hub-demo-dev.example.com:${hub.port}/wd/hub`,
     username: 'u',
     accessKey: 'k',
   });
   const caps = dev.buildCapabilitiesForTest({ platform: 'ios' });
-  assert.equal(caps.isRealMobile, true, 'devcluster hub must use LambdaTest capability style');
+  assert.equal(caps.isRealMobile, true, 'devcluster hub must use TestMu.Ai capability style');
   assert.equal(caps.frameworkType, 'mobilewright');
 
-  const plain = new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
+  const plain = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
   assert.equal(plain.buildCapabilitiesForTest({ platform: 'ios' }).isRealMobile, undefined);
 
   // explicit override wins over the hostname
-  const forced = new LambdaTestDriver({ hubUrl: `http://127.0.0.1:${hub.port}`, capabilityStyle: 'lambdatest', username: 'u', accessKey: 'k' });
+  const forced = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}`, capabilityStyle: 'testmu', username: 'u', accessKey: 'k' });
   assert.equal(forced.buildCapabilitiesForTest({ platform: 'ios' }).isRealMobile, true);
 
   await hub.close();

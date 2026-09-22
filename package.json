@@ -1,13 +1,15 @@
 {
-  "name": "@lambdatest/mobilewright",
+  "name": "@testmuai/mobilewright",
   "version": "0.1.0",
-  "description": "LambdaTest driver for Mobilewright \u2014 run Mobilewright tests on LambdaTest real devices",
+  "description": "TestMu.Ai driver for Mobilewright \u2014 run Mobilewright tests on TestMu.Ai real devices",
   "main": "./dist/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "mobilewright",
+    "testmu",
+    "testmuai",
     "lambdatest",
     "appium",
     "webdriver",

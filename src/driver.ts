@@ -28,14 +28,14 @@ import type {
 } from '@mobilewright/protocol';
 import { NoDeviceAvailableError } from '@mobilewright/protocol';
 import { appsForCriteria, buildCapabilities, resolveCredentials, type Credentials } from './capabilities.js';
-import { LambdaTestApi } from './rest.js';
+import { TestMuApi } from './rest.js';
 import { detectBuildName } from './ci.js';
-import { LambdaTestDriverError, WebDriverError } from './errors.js';
+import { TestMuDriverError, WebDriverError } from './errors.js';
 import { Keepalive } from './keepalive.js';
-import { LambdaTestObserver } from './observer.js';
+import { TestMuObserver } from './observer.js';
 import { parseSourceXml } from './parse-source.js';
 import { cropPng } from './png-crop.js';
-import type { LambdaTestDriverOptions, SnapshotTuning } from './types.js';
+import type { TestMuDriverOptions, SnapshotTuning } from './types.js';
 import {
   WebDriverClient,
   doubleTapActions,
@@ -46,17 +46,20 @@ import {
   typeTextActions,
 } from './webdriver.js';
 
-const debug = createDebug('lambdatest:driver');
+const debug = createDebug('testmu:driver');
 
 export const DEFAULT_HUB_URL = 'https://mobile-hub.lambdatest.com/wd/hub';
 const DEFAULT_ALLOCATION_TIMEOUT = 900_000;
 const DEFAULT_IDLE_TIMEOUT = 900;
 const DEFAULT_SNAPSHOT_TUNING: SnapshotTuning = { waitForIdleTimeout: 0, animationCoolOffTimeout: 0 };
 
+/** Identifies a TestMu.Ai hub by service name, without naming any environment. */
+const HUB_HOSTNAME = /(^|[/.])mobile-hub[-.]/i;
+
 /** Labels each WebDriver command with the Mobilewright verb behind it. */
 const STEP_HEADER = 'X-LT-Framework-Step';
 
-// LambdaTest session ids are long hex/uuid-ish strings; a catalog device name never is.
+// TestMu.Ai session ids are long hex/uuid-ish strings; a catalog device name never is.
 const SESSION_ID_RE = /^[0-9a-f][0-9a-f-]{19,}$/i;
 
 const ANDROID_KEYCODES: Partial<Record<HardwareButton, number>> = {
@@ -92,21 +95,21 @@ interface ActiveSession {
   screenSize?: ScreenSize;
 }
 
-export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
+export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   readonly observer: TestObserver | undefined;
 
-  private readonly options: LambdaTestDriverOptions;
+  private readonly options: TestMuDriverOptions;
   private readonly hub: WebDriverClient;
   private readonly keepalive: Keepalive;
   private readonly allocatedSessions = new Set<string>();
   private readonly appCache = new Map<string, Promise<string>>();
   private session: ActiveSession | null = null;
   private step: string | undefined;
-  private api: LambdaTestApi | undefined;
+  private api: TestMuApi | undefined;
   private planConcurrency: number | undefined;
   private concurrencyWarned = false;
 
-  constructor(options: LambdaTestDriverOptions = {}) {
+  constructor(options: TestMuDriverOptions = {}) {
     this.options = { build: detectBuildName(), ...options };
     this.hub = new WebDriverClient(
       options.hubUrl ?? DEFAULT_HUB_URL,
@@ -116,7 +119,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
     this.keepalive = new Keepalive(this.hub);
     this.observer = options.testResults === false
       ? undefined
-      : new LambdaTestObserver(
+      : new TestMuObserver(
         {
           liveSessionIds: () => [...this.allocatedSessions],
           setSessionStatus: (id, passed, reason) => this.setSessionStatus(id, passed, reason),
@@ -126,27 +129,28 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
       );
   }
 
-  /** Credentials are only mandatory against LambdaTest's own hub. */
+  /** Credentials are only mandatory against TestMu.Ai's own hub. */
   private get credentials(): Credentials | undefined {
-    return resolveCredentials(this.options, this.isLambdaTestHub);
+    return resolveCredentials(this.options, this.isTestMuHub);
   }
 
   /**
-   * Whether the hub is a LambdaTest one, which decides the capability style and
-   * whether credentials are mandatory. Devcluster hubs are
-   * `mobile-hub-<name>-dev.lambdatestinternal.com`, so both domains count.
+   * Whether the hub is a TestMu.Ai one, which decides the capability style and
+   * whether credentials are mandatory. Matched on the `mobile-hub` service name
+   * rather than a domain, so the public hub and per-developer cluster hubs both
+   * qualify. Anything else needs an explicit `capabilityStyle`.
    */
-  private get isLambdaTestHub(): boolean {
-    if (this.options.capabilityStyle) return this.options.capabilityStyle === 'lambdatest';
-    return /lambdatest(internal)?\.com/i.test(this.options.hubUrl ?? DEFAULT_HUB_URL);
+  private get isTestMuHub(): boolean {
+    if (this.options.capabilityStyle) return this.options.capabilityStyle === 'testmu';
+    return HUB_HOSTNAME.test(this.options.hubUrl ?? DEFAULT_HUB_URL);
   }
 
   /** REST client for uploads, concurrency and post-session status. */
-  private get rest(): LambdaTestApi | undefined {
-    if (!this.isLambdaTestHub) return undefined;
+  private get rest(): TestMuApi | undefined {
+    if (!this.isTestMuHub) return undefined;
     const credentials = this.credentials;
     if (!credentials) return undefined;
-    this.api ??= new LambdaTestApi(credentials, this.options.apiBase, this.options.uploadUrl);
+    this.api ??= new TestMuApi(credentials, this.options.apiBase, this.options.uploadUrl);
     return this.api;
   }
 
@@ -169,13 +173,13 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
 
   async allocate(criteria: AllocationCriteria, _taken: ReadonlySet<string>, signal?: AbortSignal): Promise<AllocatedDevice> {
     if (!criteria.platform) {
-      throw new LambdaTestDriverError('allocate requires a platform ("ios" or "android").');
+      throw new TestMuDriverError('allocate requires a platform ("ios" or "android").');
     }
-    // Only LambdaTest's own hub is real-devices-only; a custom hub (local
+    // Only TestMu.Ai's own hub is real-devices-only; a custom hub (local
     // Appium during development) may well be a simulator or emulator.
-    if (this.isLambdaTestHub && criteria.deviceType && criteria.deviceType !== 'real') {
-      throw new LambdaTestDriverError(
-        `LambdaTest real-device automation provides real devices only (requested deviceType "${criteria.deviceType}").`,
+    if (this.isTestMuHub && criteria.deviceType && criteria.deviceType !== 'real') {
+      throw new TestMuDriverError(
+        `TestMu.Ai real-device automation provides real devices only (requested deviceType "${criteria.deviceType}").`,
       );
     }
 
@@ -185,14 +189,14 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
       this.optionsWithDefaults(),
       appRefs,
       this.credentials,
-      { style: this.isLambdaTestHub ? 'lambdatest' : 'w3c' },
+      { style: this.isTestMuHub ? 'testmu' : 'w3c' },
     );
     const timeout = this.options.allocationTimeout ?? DEFAULT_ALLOCATION_TIMEOUT;
 
     if (this.planConcurrency !== undefined && this.allocatedSessions.size >= this.planConcurrency && !this.concurrencyWarned) {
       this.concurrencyWarned = true;
       console.warn(
-        `[LambdaTest] Plan concurrency is ${this.planConcurrency}; further workers will queue until a session is released.`,
+        `[TestMu.Ai] Plan concurrency is ${this.planConcurrency}; further workers will queue until a session is released.`,
       );
     }
     debug('creating session (platform=%s, device=%s)', criteria.platform, criteria.deviceNamePattern ?? 'any');
@@ -205,7 +209,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
     }
     if (signal?.aborted) {
       await this.hub.deleteSession(sessionId).catch(() => {});
-      throw new LambdaTestDriverError('allocation aborted');
+      throw new TestMuDriverError('allocation aborted');
     }
 
     this.allocatedSessions.add(sessionId);
@@ -213,12 +217,12 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
 
     const deviceName = String(matched['deviceName'] ?? matched['appium:deviceName'] ?? criteria.deviceNamePattern ?? '');
     const osVersion = String(matched['platformVersion'] ?? matched['appium:platformVersion'] ?? criteria.osVersion ?? '');
-    console.log(`[LambdaTest] session ${sessionId}${deviceName ? ` on ${deviceName}${osVersion ? `-${osVersion}` : ''}` : ''}`);
+    console.log(`[TestMu.Ai] session ${sessionId}${deviceName ? ` on ${deviceName}${osVersion ? `-${osVersion}` : ''}` : ''}`);
 
     return {
       deviceId: sessionId,
       platform: criteria.platform,
-      driver: 'lambdatest',
+      driver: 'testmu',
       ...(deviceName ? { model: deviceName } : {}),
       ...(osVersion ? { osVersion } : {}),
       type: criteria.deviceType ?? 'real',
@@ -230,7 +234,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
     this.allocatedSessions.delete(deviceId);
     // Deleting the session ends it, and the executor hooks only reach a live
     // one — so this is the last chance to put a verdict on the dashboard.
-    const verdict = (this.observer as LambdaTestObserver | undefined)?.verdict?.();
+    const verdict = (this.observer as TestMuObserver | undefined)?.verdict?.();
     if (verdict) {
       if (verdict.name) await this.setSessionName(deviceId, verdict.name);
       await this.setSessionStatus(deviceId, verdict.passed, verdict.reason);
@@ -251,7 +255,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
   }
 
   /**
-   * LambdaTest queues a session create while every device that matches is busy,
+   * TestMu.Ai queues a session create while every device that matches is busy,
    * and answers 429 once the plan's parallel limit is reached. Neither is a bad
    * request: the pool re-queues NoDeviceAvailableError until a slot frees up,
    * instead of failing every test that a worker picks up meanwhile.
@@ -265,7 +269,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
     return err as Error;
   }
 
-  private optionsWithDefaults(): LambdaTestDriverOptions {
+  private optionsWithDefaults(): TestMuDriverOptions {
     return { idleTimeout: DEFAULT_IDLE_TIMEOUT, ...this.options };
   }
 
@@ -488,7 +492,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
       }
       const keycode = ANDROID_KEYCODES[button];
       if (keycode === undefined) {
-        throw new LambdaTestDriverError(`Unsupported hardware button on Android: ${button}`);
+        throw new TestMuDriverError(`Unsupported hardware button on Android: ${button}`);
       }
       await this.hub.mobile(sessionId, 'pressKey', { keycode });
       return;
@@ -508,7 +512,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
     }
     const name = IOS_BUTTON_NAMES[button];
     if (!name) {
-      throw new LambdaTestDriverError(`Unsupported hardware button on iOS: ${button}`);
+      throw new TestMuDriverError(`Unsupported hardware button on iOS: ${button}`);
     }
     await this.hub.mobile(sessionId, 'pressButton', { name });
   }
@@ -627,7 +631,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
     const { sessionId } = await this.nativeSession();
     const [appUrl] = await this.resolveApps([pathOrRef]);
     if (!appUrl?.startsWith('lt://')) {
-      throw new LambdaTestDriverError(
+      throw new TestMuDriverError(
         `Cannot install "${pathOrRef}" mid-session: it did not resolve to an lt:// app id. ` +
         'Upload it first, or declare it in the driver\'s `app`/`apps` option.',
       );
@@ -658,7 +662,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
   }
 
   async applyDeviceSettings(settings: DeviceSettings): Promise<void> {
-    // Animations are a session capability on LambdaTest (disableAnimation),
+    // Animations are a session capability on TestMu.Ai (disableAnimation),
     // applied at allocation — there is no runtime toggle over a cloud session.
     debug('applyDeviceSettings(%o) is a no-op; use driver option disableAnimation', settings);
   }
@@ -666,7 +670,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
   // ─── Recording ──────────────────────────────────────────────
 
   async startRecording(_opts: RecordingOptions): Promise<void> {
-    // LambdaTest records the whole session server-side; nothing to start.
+    // TestMu.Ai records the whole session server-side; nothing to start.
     debug('startRecording: server-side video covers the session');
   }
 
@@ -706,7 +710,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
     debug('context -> %s', name);
   }
 
-  // ─── LambdaTest hooks ───────────────────────────────────────
+  // ─── TestMu.Ai hooks ───────────────────────────────────────
 
   /** Runs a `lambda-*` executor hook on the live session. */
   async executeLambdaHook<T = unknown>(payload: string): Promise<T> {
@@ -755,7 +759,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
   /** Test seam: the capabilities this driver would send for a given allocation. */
   buildCapabilitiesForTest(criteria: AllocationCriteria, appRefs: string[] = ['lt://TEST']): Record<string, unknown> {
     return buildCapabilities(criteria, this.optionsWithDefaults(), appRefs, this.credentials, {
-      style: this.isLambdaTestHub ? 'lambdatest' : 'w3c',
+      style: this.isTestMuHub ? 'testmu' : 'w3c',
     }).alwaysMatch;
   }
 
@@ -767,7 +771,7 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
 
   private require(): ActiveSession {
     if (!this.session) {
-      throw new LambdaTestDriverError('No active session. Call connect() first.');
+      throw new TestMuDriverError('No active session. Call connect() first.');
     }
     return this.session;
   }

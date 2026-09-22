@@ -1,7 +1,7 @@
 import type { AllocationCriteria, Platform } from '@mobilewright/protocol';
 import { parseOsVersion } from '@mobilewright/protocol';
-import { LambdaTestDriverError } from './errors.js';
-import type { LambdaTestDriverOptions } from './types.js';
+import { TestMuDriverError } from './errors.js';
+import type { TestMuDriverOptions } from './types.js';
 
 /** Dashboard label for sessions this driver creates. */
 export const FRAMEWORK_TYPE = 'mobilewright';
@@ -11,20 +11,20 @@ export interface Credentials {
   accessKey: string;
 }
 
-export function resolveCredentials(options: LambdaTestDriverOptions, required: boolean): Credentials | undefined {
+export function resolveCredentials(options: TestMuDriverOptions, required: boolean): Credentials | undefined {
   const username = options.username ?? process.env['LT_USERNAME'];
   const accessKey = options.accessKey ?? process.env['LT_ACCESS_KEY'];
   if (!username || !accessKey) {
     if (!required) return undefined;
-    throw new LambdaTestDriverError(
-      'LambdaTest credentials are missing. Set LT_USERNAME and LT_ACCESS_KEY, or pass { username, accessKey } to the driver.',
+    throw new TestMuDriverError(
+      'TestMu.Ai credentials are missing. Set LT_USERNAME and LT_ACCESS_KEY, or pass { username, accessKey } to the driver.',
     );
   }
   return { username, accessKey };
 }
 
 /** Apps for this allocation, most specific key first ('ios-real' beats 'ios'). */
-export function appsForCriteria(criteria: AllocationCriteria, options: LambdaTestDriverOptions): string[] {
+export function appsForCriteria(criteria: AllocationCriteria, options: TestMuDriverOptions): string[] {
   const platform = criteria.platform;
   if (!platform) return [];
 
@@ -38,22 +38,22 @@ export function appsForCriteria(criteria: AllocationCriteria, options: LambdaTes
 }
 
 /**
- * LambdaTest matches `deviceName` and `platformVersion` as regular expressions
+ * TestMu.Ai matches `deviceName` and `platformVersion` as regular expressions
  * for app automation, so a mobilewright device pattern goes straight through
  * and no catalog lookup is needed. Anchored group form is what their docs use.
  */
-export function toLambdaTestDeviceName(pattern: string | undefined): string | undefined {
+export function toTestMuDeviceName(pattern: string | undefined): string | undefined {
   if (!pattern) return undefined;
   return /[.*+?^${}()|[\]\\]/.test(pattern) ? `(${pattern}.*)` : pattern;
 }
 
 /**
  * Mobilewright's osVersion grammar ("17", "26.0", ">=17 <19") is a range, while
- * LambdaTest's platformVersion is an exact value or a regex. Exact versions and
+ * TestMu.Ai's platformVersion is an exact value or a regex. Exact versions and
  * simple prefixes pass through; a bounded range becomes an alternation over the
  * major versions it admits, which is the closest faithful translation.
  */
-export function toLambdaTestPlatformVersion(osVersion: string | undefined): string | undefined {
+export function toTestMuPlatformVersion(osVersion: string | undefined): string | undefined {
   if (!osVersion) return undefined;
   if (!/[<>=~^\s]/.test(osVersion)) return osVersion;
 
@@ -78,31 +78,31 @@ function platformName(platform: Platform): string {
 
 export interface CapabilityStyle {
   /**
-   * 'lambdatest' is the flat capability set their Appium docs specify.
+   * 'testmu' is the flat capability set their Appium docs specify.
    * 'w3c' prefixes vendor capabilities, for a standard Appium server — which is
    * how the driver is exercised against a local Appium during development.
    */
-  style: 'lambdatest' | 'w3c';
+  style: 'testmu' | 'w3c';
 }
 
 export function buildCapabilities(
   criteria: AllocationCriteria,
-  options: LambdaTestDriverOptions,
+  options: TestMuDriverOptions,
   appRefs: string[],
   credentials: Credentials | undefined,
-  { style }: CapabilityStyle = { style: 'lambdatest' },
+  { style }: CapabilityStyle = { style: 'testmu' },
 ): { alwaysMatch: Record<string, unknown>; firstMatch: Record<string, unknown>[] } {
   const platform = criteria.platform;
   if (!platform) {
-    throw new LambdaTestDriverError(
+    throw new TestMuDriverError(
       'A platform ("ios" or "android") is required to allocate a device. Set `platform` in your mobilewright config, top-level or in a project\'s `use` block.',
     );
   }
 
   const automationName = platform === 'ios' ? 'XCUITest' : 'UiAutomator2';
   const [app, ...otherApps] = appRefs;
-  const deviceName = toLambdaTestDeviceName(criteria.deviceNamePattern);
-  const platformVersion = toLambdaTestPlatformVersion(criteria.osVersion);
+  const deviceName = toTestMuDeviceName(criteria.deviceNamePattern);
+  const platformVersion = toTestMuPlatformVersion(criteria.osVersion);
 
   if (style === 'w3c') {
     const caps: Record<string, unknown> = {
@@ -130,23 +130,23 @@ export function buildCapabilities(
     ...(app ? { app } : {}),
   };
 
-  // LambdaTest derives isAppAutomate from the presence of `app`, and that flag
+  // TestMu.Ai derives isAppAutomate from the presence of `app`, and that flag
   // decides the sub-test type used for device allocation. Without an app the
   // session is allocated as web automation and fails confusingly downstream.
   const escapeHatchApp = options.capabilities?.['app'] ?? options.ltOptions?.['app'] ?? options.capabilities?.['browserName'];
   if (!app && !escapeHatchApp) {
-    throw new LambdaTestDriverError(
-      'A LambdaTest session must start with an app. Set the driver\'s `app` option ' +
+    throw new TestMuDriverError(
+      'A TestMu.Ai session must start with an app. Set the driver\'s `app` option ' +
       '(an lt://APP_ID, a local .apk/.ipa path, or an https url), or a per-platform `apps` entry.',
     );
   }
 
-  // LambdaTest caps otherApps at 3 and rejects duplicates of the main app.
+  // TestMu.Ai caps otherApps at 3 and rejects duplicates of the main app.
   if (otherApps.length) {
     const extras = [...new Set(otherApps)].filter((ref) => ref !== app);
     if (extras.length > 3) {
-      throw new LambdaTestDriverError(
-        `LambdaTest installs at most 3 additional apps per session; ${extras.length} were configured.`,
+      throw new TestMuDriverError(
+        `TestMu.Ai installs at most 3 additional apps per session; ${extras.length} were configured.`,
       );
     }
     caps['otherApps'] = extras;

@@ -27,7 +27,7 @@ export interface SnapshotTuning {
   customSnapshotTimeout?: number;
 }
 
-export interface LambdaTestDriverOptions {
+export interface TestMuDriverOptions {
   /** Defaults to LT_USERNAME. */
   username?: string;
   /** Defaults to LT_ACCESS_KEY. */
@@ -68,7 +68,7 @@ export interface LambdaTestDriverOptions {
   idleTimeout?: number;
   /** Max session length in seconds. */
   maxDuration?: number;
-  /** Seconds LambdaTest holds a queued session create. 300-900, default 600. */
+  /** Seconds TestMu.Ai holds a queued session create. 300-900, default 600. */
   queueTimeout?: number;
   /** Data centre: 'US' | 'EU' | 'AP'. Defaults to the nearest. */
   region?: 'US' | 'EU' | 'AP';
@@ -116,10 +116,10 @@ export interface LambdaTestDriverOptions {
 
   /**
    * Force the capability style instead of inferring it from `hubUrl`.
-   * 'lambdatest' sends LambdaTest's flat capabilities; 'w3c' sends prefixed
+   * 'testmu' sends TestMu.Ai's flat capabilities; 'w3c' sends prefixed
    * vendor capabilities for a plain Appium server.
    */
-  capabilityStyle?: 'lambdatest' | 'w3c';
+  capabilityStyle?: 'testmu' | 'w3c';
 
   /** Escape hatches merged last. */
   capabilities?: Record<string, unknown>;

@@ -2,7 +2,7 @@ import createDebug from 'debug';
 import { WebDriverError } from './errors.js';
 import type { WebDriverClient } from './webdriver.js';
 
-const debug = createDebug('lambdatest:keepalive');
+const debug = createDebug('testmu:keepalive');
 
 const PING_INTERVAL_MS = 45_000;
 const PING_TIMEOUT_MS = 15_000;

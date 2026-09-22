@@ -2,7 +2,7 @@ import createDebug from 'debug';
 import type { WebViewSession } from '@mobilewright/protocol';
 import type { WebDriverClient } from './webdriver.js';
 
-const debug = createDebug('lambdatest:webview');
+const debug = createDebug('testmu:webview');
 
 const SCRIPT_TIMEOUT_MS = 30_000;
 

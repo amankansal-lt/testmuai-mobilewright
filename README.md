@@ -1,29 +1,29 @@
-# @lambdatest/mobilewright
+# @testmuai/mobilewright
 
-LambdaTest driver for [Mobilewright](https://github.com/mobile-next/mobilewright). Runs an
-existing Mobilewright suite on LambdaTest real devices by changing one line of config — the
+TestMu.Ai driver for [Mobilewright](https://github.com/mobile-next/mobilewright). Runs an
+existing Mobilewright suite on TestMu.Ai real devices by changing one line of config — the
 tests themselves are untouched.
 
-**Status: working prototype.** Verb mappings, the page-source parser, the webview bridge and
-the session lifecycle are validated against a real Appium server driving real hardware. Not yet
-run against LambdaTest's hub (needs credentials and an uploaded app), and Android is unverified.
+**Status: working.** Verified end to end on a real iPhone through a TestMu.Ai cluster — session
+creation, device allocation, locators, taps, element screenshots and teardown. Android is still
+unverified, and webviews need an inspectable build (see below).
 
 ## Install
 
 ```bash
-npm i -D @lambdatest/mobilewright
+npm i -D @testmuai/mobilewright
 export LT_USERNAME=... LT_ACCESS_KEY=...
 ```
 
 ```ts
 // mobilewright.config.ts
 import { defineConfig } from 'mobilewright';
-import { lambdaTestDriver } from '@lambdatest/mobilewright';
+import { testMuDriver } from '@testmuai/mobilewright';
 
 export default defineConfig({
   testDir: './tests',
   bundleId: 'com.example.app',
-  driver: lambdaTestDriver({ app: './build/app.ipa' }),   // lt://APP_ID, a local path, or an https url
+  driver: testMuDriver({ app: './build/app.ipa' }),   // lt://APP_ID, a local path, or an https url
   projects: [
     { name: 'ios', use: { platform: 'ios', deviceType: 'real', deviceName: /iPhone 1[45]/, osVersion: '>=17 <19' } },
     { name: 'android', use: { platform: 'android', deviceType: 'real' } },
@@ -35,22 +35,22 @@ export default defineConfig({
 npx mobilewright test
 ```
 
-Keep one config and switch by environment — local device by default, LambdaTest when
+Keep one config and switch by environment — local device by default, TestMu.Ai when
 credentials are present:
 
 ```ts
-if (process.env.LT_USERNAME) config.driver = lambdaTestDriver({ app: './build/app.apk' });
+if (process.env.LT_USERNAME) config.driver = testMuDriver({ app: './build/app.apk' });
 ```
 
 ## How it works
 
-One LambdaTest Appium session per Mobilewright worker slot; the session id is the pool's
+One TestMu.Ai Appium session per Mobilewright worker slot; the session id is the pool's
 `deviceId`, and workers attach to it. Each Mobilewright verb becomes a W3C WebDriver command —
 `getViewHierarchy()` is `GET /source` parsed into `ViewNode`s, taps and swipes are `/actions`,
 app lifecycle is `mobile:` commands, webviews are Appium contexts. Nothing is installed on the
-device host: it is the same WDA / UiAutomator2 stack LambdaTest already runs for Appium.
+device host: it is the same WDA / UiAutomator2 stack TestMu.Ai already runs for Appium.
 
-Device selection needs no catalog lookup — LambdaTest matches `deviceName` and
+Device selection needs no catalog lookup — TestMu.Ai matches `deviceName` and
 `platformVersion` as regular expressions, so a Mobilewright `deviceName: /iPhone 1[45]/` passes
 straight through, and an `osVersion` range becomes a major-version alternation.
 
@@ -62,13 +62,13 @@ straight through, and an `osVersion` range becomes a major-version alternation.
 | `username` / `accessKey` | `LT_USERNAME` / `LT_ACCESS_KEY` | |
 | `build` / `project` / `name` / `tags` | build auto-detected from CI | GitHub Actions, GitLab, CircleCI, Buildkite, Bitrise, Azure, Jenkins, TeamCity |
 | `sessionPerTest` | `false` | one session, video and verdict per test |
-| `idleTimeout` | `900` | raised from LambdaTest's 120s default because a pooled slot idles between tests; paired with a 45s keepalive ping |
-| `allocationTimeout` | `900000` | covers LambdaTest's own device queue |
+| `idleTimeout` | `900` | raised from TestMu.Ai's 120s default because a pooled slot idles between tests; paired with a 45s keepalive ping |
+| `allocationTimeout` | `900000` | covers TestMu.Ai's own device queue |
 | `snapshotTuning` | `{ waitForIdleTimeout: 0, animationCoolOffTimeout: 0 }` | see below; `false` leaves server defaults |
 | `visibility` | `'native'` | `'bounds'` matches mobilecli's looser semantics — see below |
-| `tunnel` / `tunnelName`, `geoLocation`, `timezone`, `networkLog`, `deviceLog`, `video`, `disableAnimation`, `autoGrantPermissions`, `autoAcceptAlerts`, `autoDismissAlerts`, `appiumVersion`, `region`, `queueTimeout`, `maxDuration` | | mapped to LambdaTest capabilities |
+| `tunnel` / `tunnelName`, `geoLocation`, `timezone`, `networkLog`, `deviceLog`, `video`, `disableAnimation`, `autoGrantPermissions`, `autoAcceptAlerts`, `autoDismissAlerts`, `appiumVersion`, `region`, `queueTimeout`, `maxDuration` | | mapped to TestMu.Ai capabilities |
 | `capabilities` / `ltOptions` | | escape hatches, merged last |
-| `hubUrl` / `apiBase` / `uploadUrl` | LambdaTest | point `hubUrl` at a local Appium for development |
+| `hubUrl` / `apiBase` / `uploadUrl` | TestMu.Ai | point `hubUrl` at a local Appium for development |
 
 ### Snapshot tuning
 
@@ -106,21 +106,28 @@ session that hosted several tests is reported with a run summary (`11/12 tests p
 ## Development
 
 ```bash
-npm run build && npm run typecheck && npm test      # 21 unit tests, no device needed
+npm run build && npm run typecheck && npm test      # 33 unit tests, no device needed
 ```
 
-To exercise it against real hardware without LambdaTest credentials, point `hubUrl` at a local
+To exercise it against real hardware without TestMu.Ai credentials, point `hubUrl` at a local
 Appium — the protocol is identical:
 
 ```ts
-driver: lambdaTestDriver({
+driver: testMuDriver({
   hubUrl: 'http://127.0.0.1:4723',
   visibility: 'bounds',
   capabilities: { 'appium:udid': '...', 'appium:bundleId': 'com.example.app' },
 })
 ```
 
-`DEBUG=lambdatest:*` logs allocation, every hub command, uploads and verdict pushes.
+`DEBUG=testmu:*` logs allocation, every hub command, uploads and verdict pushes.
+
+### Naming
+
+The package is branded TestMu.Ai, but the wire protocol is not renamed: `LT_USERNAME`,
+`LT_ACCESS_KEY`, `LT_APP`, `lt://` app ids, the `lambda-status=` / `lambda-hook:` executor
+hooks and the `*.lambdatest.com` hostnames are what the platform actually speaks, so they stay
+exactly as the server expects them.
 
 ## License
 

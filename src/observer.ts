@@ -1,7 +1,7 @@
 import createDebug from 'debug';
 import type { RunResultInfo, TestInfo, TestObserver, TestResultInfo } from '@mobilewright/protocol';
 
-const debug = createDebug('lambdatest:observer');
+const debug = createDebug('testmu:observer');
 
 interface StatusSink {
   /** Sessions this driver allocated and has not released yet. */
@@ -11,7 +11,7 @@ interface StatusSink {
 }
 
 /**
- * Names sessions and pushes verdicts to the LambdaTest dashboard.
+ * Names sessions and pushes verdicts to the TestMu.Ai dashboard.
  *
  * Runs in the coordinator process, the same one that allocated the sessions,
  * so it can reach them directly. Verdicts are pushed at `onRunEnd`, while the
@@ -20,7 +20,7 @@ interface StatusSink {
  * A pooled session hosts several tests, so it is reported with a run summary
  * rather than one test's verdict. Per-test naming requires `sessionPerTest`.
  */
-export class LambdaTestObserver implements TestObserver {
+export class TestMuObserver implements TestObserver {
   private passed = 0;
   private failed = 0;
   private total = 0;
