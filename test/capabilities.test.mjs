@@ -102,15 +102,42 @@ test('apps map prefers the most specific key', () => {
   assert.deepEqual(appsForCriteria({ platform: 'android' }, options), ['./a.apk', './helper.apk']);
 });
 
-test('single app option and LT_APP fallback', () => {
+test('the app comes from options, TESTMU_APP, then LT_APP', () => {
   assert.deepEqual(appsForCriteria({ platform: 'ios' }, { app: 'lt://X' }), ['lt://X']);
-  process.env.LT_APP = 'lt://FROM_ENV';
-  assert.deepEqual(appsForCriteria({ platform: 'ios' }, {}), ['lt://FROM_ENV']);
+
+  process.env.LT_APP = 'lt://FROM_LT';
+  assert.deepEqual(appsForCriteria({ platform: 'ios' }, {}), ['lt://FROM_LT']);
+
+  process.env.TESTMU_APP = 'lt://FROM_TESTMU';
+  assert.deepEqual(appsForCriteria({ platform: 'ios' }, {}), ['lt://FROM_TESTMU'], 'TESTMU_ must win over LT_');
+
+  delete process.env.TESTMU_APP;
   delete process.env.LT_APP;
 });
 
-test('credentials come from options or env, and are optional off-hub', () => {
+test('credentials come from options, then TESTMU_, then LT_', () => {
+  const clear = () => ['TESTMU_USERNAME', 'TESTMU_ACCESS_KEY', 'LT_USERNAME', 'LT_ACCESS_KEY']
+    .forEach((k) => delete process.env[k]);
+  clear();
+
+  // explicit options win over everything
   assert.deepEqual(resolveCredentials({ username: 'u', accessKey: 'k' }, true), { username: 'u', accessKey: 'k' });
+
+  // the LT_ names existing pipelines already set keep working
+  process.env.LT_USERNAME = 'lt-user';
+  process.env.LT_ACCESS_KEY = 'lt-key';
+  assert.deepEqual(resolveCredentials({}, true), { username: 'lt-user', accessKey: 'lt-key' });
+
+  // TESTMU_ takes precedence when both are present
+  process.env.TESTMU_USERNAME = 'testmu-user';
+  process.env.TESTMU_ACCESS_KEY = 'testmu-key';
+  assert.deepEqual(resolveCredentials({}, true), { username: 'testmu-user', accessKey: 'testmu-key' });
+
+  // the two families can be mixed
+  delete process.env.TESTMU_ACCESS_KEY;
+  assert.deepEqual(resolveCredentials({}, true), { username: 'testmu-user', accessKey: 'lt-key' });
+
+  clear();
   assert.equal(resolveCredentials({}, false), undefined);
-  assert.throws(() => resolveCredentials({}, true), /LT_USERNAME and LT_ACCESS_KEY/);
+  assert.throws(() => resolveCredentials({}, true), /TESTMU_USERNAME \(or LT_USERNAME\)/);
 });

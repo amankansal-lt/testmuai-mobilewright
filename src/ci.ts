@@ -1,3 +1,5 @@
+import { envValue } from './env.js';
+
 const env = (name: string): string | undefined => process.env[name] || undefined;
 
 /**
@@ -5,7 +7,7 @@ const env = (name: string): string | undefined => process.env[name] || undefined
  * Checked in order; the first provider that identifies itself wins.
  */
 export function detectBuildName(): string | undefined {
-  const explicit = env('LT_BUILD');
+  const explicit = envValue('BUILD');
   if (explicit) return explicit;
 
   if (env('GITHUB_ACTIONS')) {

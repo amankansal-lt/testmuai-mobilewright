@@ -12,7 +12,7 @@ unverified, and webviews need an inspectable build (see below).
 
 ```bash
 npm i -D @testmuai/mobilewright
-export LT_USERNAME=... LT_ACCESS_KEY=...
+export TESTMU_USERNAME=... TESTMU_ACCESS_KEY=...   # LT_USERNAME / LT_ACCESS_KEY also work
 ```
 
 ```ts
@@ -39,7 +39,7 @@ Keep one config and switch by environment — local device by default, TestMu.Ai
 credentials are present:
 
 ```ts
-if (process.env.LT_USERNAME) config.driver = testMuDriver({ app: './build/app.apk' });
+if (process.env.TESTMU_USERNAME) config.driver = testMuDriver({ app: './build/app.apk' });
 ```
 
 ## How it works
@@ -58,8 +58,8 @@ straight through, and an `osVersion` range becomes a major-version alternation.
 
 | Option | Default | Notes |
 |---|---|---|
-| `app` / `apps` | `LT_APP` | `lt://APP_ID`, local `.apk`/`.ipa` (uploaded once per run, cached by content hash), or https url. `apps` is keyed `ios`/`android`/`ios-real`/`android-real`; an array installs helper apps as `otherApps` (max 3) |
-| `username` / `accessKey` | `LT_USERNAME` / `LT_ACCESS_KEY` | |
+| `app` / `apps` | `TESTMU_APP`, else `LT_APP` | `lt://APP_ID`, local `.apk`/`.ipa` (uploaded once per run, cached by content hash), or https url. `apps` is keyed `ios`/`android`/`ios-real`/`android-real`; an array installs helper apps as `otherApps` (max 3) |
+| `username` / `accessKey` | `TESTMU_USERNAME` / `TESTMU_ACCESS_KEY`, falling back to `LT_USERNAME` / `LT_ACCESS_KEY` | |
 | `build` / `project` / `name` / `tags` | build auto-detected from CI | GitHub Actions, GitLab, CircleCI, Buildkite, Bitrise, Azure, Jenkins, TeamCity |
 | `sessionPerTest` | `false` | one session, video and verdict per test |
 | `idleTimeout` | `900` | raised from TestMu.Ai's 120s default because a pooled slot idles between tests; paired with a 45s keepalive ping |
@@ -124,10 +124,14 @@ driver: testMuDriver({
 
 ### Naming
 
-The package is branded TestMu.Ai, but the wire protocol is not renamed: `LT_USERNAME`,
-`LT_ACCESS_KEY`, `LT_APP`, `lt://` app ids, the `lambda-status=` / `lambda-hook:` executor
-hooks and the `*.lambdatest.com` hostnames are what the platform actually speaks, so they stay
-exactly as the server expects them.
+Environment variables read `TESTMU_USERNAME`, `TESTMU_ACCESS_KEY`, `TESTMU_APP` and
+`TESTMU_BUILD` first, then fall back to the `LT_`-prefixed names. Both are supported
+indefinitely — the fallback is not a deprecation, it is what existing pipelines are already
+configured with, and the two families can be mixed.
+
+The wire protocol is deliberately **not** renamed: `lt://` app ids, the `lambda-status=` /
+`lambda-hook:` executor hooks and the `*.lambdatest.com` hostnames are what the platform
+actually speaks, so they stay exactly as the server expects them.
 
 ## License
 

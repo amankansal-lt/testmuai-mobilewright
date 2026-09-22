@@ -1,6 +1,7 @@
 import type { AllocationCriteria, Platform } from '@mobilewright/protocol';
 import { parseOsVersion } from '@mobilewright/protocol';
 import { TestMuDriverError } from './errors.js';
+import { envNames, envValue } from './env.js';
 import type { TestMuDriverOptions } from './types.js';
 
 /** Dashboard label for sessions this driver creates. */
@@ -12,12 +13,13 @@ export interface Credentials {
 }
 
 export function resolveCredentials(options: TestMuDriverOptions, required: boolean): Credentials | undefined {
-  const username = options.username ?? process.env['LT_USERNAME'];
-  const accessKey = options.accessKey ?? process.env['LT_ACCESS_KEY'];
+  const username = options.username ?? envValue('USERNAME');
+  const accessKey = options.accessKey ?? envValue('ACCESS_KEY');
   if (!username || !accessKey) {
     if (!required) return undefined;
     throw new TestMuDriverError(
-      'TestMu.Ai credentials are missing. Set LT_USERNAME and LT_ACCESS_KEY, or pass { username, accessKey } to the driver.',
+      `TestMu.Ai credentials are missing. Set ${envNames('USERNAME')} and ${envNames('ACCESS_KEY')}, ` +
+      'or pass { username, accessKey } to the driver.',
     );
   }
   return { username, accessKey };
@@ -33,7 +35,7 @@ export function appsForCriteria(criteria: AllocationCriteria, options: TestMuDri
   const configured = specific ?? apps[platform as keyof typeof apps];
   if (configured) return Array.isArray(configured) ? configured.filter(Boolean) : [configured];
 
-  const single = options.app ?? process.env['LT_APP'];
+  const single = options.app ?? envValue('APP');
   return single ? [single] : [];
 }
 
