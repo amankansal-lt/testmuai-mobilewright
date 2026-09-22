@@ -23,6 +23,13 @@ async function startHub() {
         res.end(JSON.stringify({ value: SOURCE }));
       } else if (req.url.endsWith('/actions') || req.url.endsWith('/appium/settings')) {
         res.end(JSON.stringify({ value: null }));
+      } else if (req.url.endsWith('/orientation')) {
+        res.end(JSON.stringify({ value: 'PORTRAIT' }));
+      } else if (req.url.endsWith('/window/rect')) {
+        res.end(JSON.stringify({ value: { width: 390, height: 844 } }));
+      } else if (req.url.endsWith('/screenshot')) {
+        // 1x1 PNG, enough for the scale probe to read an IHDR width
+        res.end(JSON.stringify({ value: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' }));
       } else {
         res.end(JSON.stringify({ value: {} }));
       }
@@ -126,4 +133,35 @@ test('devcluster hubs are recognised as TestMu.Ai hubs', async () => {
   assert.equal(forced.buildCapabilitiesForTest({ platform: 'ios' }).isRealMobile, true);
 
   await hub.close();
+});
+
+test('every verb that issues hub commands labels them', async () => {
+  const hub = await startHub();
+  const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
+  await driver.connect({ platform: 'ios', deviceId: SESSION_ID });
+
+  // a representative spread, including verbs that call other verbs internally
+  await driver.getViewHierarchy();
+  await driver.tap(1, 2);
+  await driver.doubleTap(1, 2);
+  await driver.pressKeys(['enter']);
+  await driver.getOrientation();
+  await driver.launchApp('com.example.app');
+  await driver.openUrl('https://example.com');
+
+  const steps = new Set(hub.seen.map((r) => r.step).filter(Boolean));
+  for (const verb of ['getViewHierarchy', 'tap', 'doubleTap', 'pressKeys', 'getOrientation', 'launchApp', 'openUrl']) {
+    assert.ok(steps.has(verb), `no command was labelled "${verb}" (saw: ${[...steps].join(', ')})`);
+  }
+
+  // a verb that calls another verb reports the innermost one, then restores
+  const swipeHub = await startHub();
+  const d2 = new TestMuDriver({ hubUrl: `http://127.0.0.1:${swipeHub.port}` });
+  await d2.connect({ platform: 'ios', deviceId: SESSION_ID });
+  await d2.swipe('up');
+  const actions = swipeHub.seen.filter((r) => r.path.endsWith('/actions'));
+  assert.equal(actions.at(-1).step, 'swipe', 'the swipe action itself must be labelled swipe, not getScreenSize');
+
+  await hub.close();
+  await swipeHub.close();
 });

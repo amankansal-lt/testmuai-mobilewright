@@ -53,6 +53,18 @@ const DEFAULT_ALLOCATION_TIMEOUT = 900_000;
 const DEFAULT_IDLE_TIMEOUT = 900;
 const DEFAULT_SNAPSHOT_TUNING: SnapshotTuning = { waitForIdleTimeout: 0, animationCoolOffTimeout: 0 };
 
+/**
+ * Every driver verb that issues hub commands. Each is wrapped so the commands
+ * it raises carry the verb's name, which is what makes a command log readable
+ * as framework calls instead of raw `GET /source` traffic.
+ */
+const LABELLED_VERBS = [
+  'getViewHierarchy', 'tap', 'doubleTap', 'longPress', 'typeText', 'pressKeys',
+  'clearText', 'swipe', 'gesture', 'pressButton', 'screenshot', 'getScreenSize',
+  'getOrientation', 'setOrientation', 'setGeolocation', 'launchApp', 'terminateApp',
+  'listApps', 'getForegroundApp', 'installApp', 'uninstallApp', 'openUrl',
+] as const;
+
 /** Identifies a TestMu.Ai hub by service name, without naming any environment. */
 const HUB_HOSTNAME = /(^|[/.])mobile-hub[-.]/i;
 
@@ -117,6 +129,7 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
       () => (this.step && options.stepHeader !== false ? { [STEP_HEADER]: this.step } : undefined),
     );
     this.keepalive = new Keepalive(this.hub);
+    this.labelVerbs();
     this.observer = options.testResults === false
       ? undefined
       : new TestMuObserver(
@@ -330,11 +343,9 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   // ─── UI hierarchy ───────────────────────────────────────────
 
   async getViewHierarchy(): Promise<ViewNode[]> {
-    return this.stepped('getViewHierarchy', async () => {
-      const { sessionId, platform } = await this.nativeSession();
-      const xml = await this.hub.source(sessionId);
-      return parseSourceXml(xml, platform, this.options.visibility ?? 'native');
-    });
+    const { sessionId, platform } = await this.nativeSession();
+    const xml = await this.hub.source(sessionId);
+    return parseSourceXml(xml, platform, this.options.visibility ?? 'native');
   }
 
   /**
@@ -355,10 +366,8 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   // ─── Input ──────────────────────────────────────────────────
 
   async tap(x: number, y: number): Promise<void> {
-    return this.stepped('tap', async () => {
-      const { sessionId } = await this.nativeSession();
-      await this.hub.performActions(sessionId, tapActions(x, y));
-    });
+    const { sessionId } = await this.nativeSession();
+    await this.hub.performActions(sessionId, tapActions(x, y));
   }
 
   async doubleTap(x: number, y: number): Promise<void> {
@@ -554,8 +563,10 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
 
   async getOrientation(): Promise<Orientation> {
     const { sessionId } = this.require();
-    const value = await this.hub.get<string>(sessionId, '/orientation');
-    return value?.toUpperCase() === 'LANDSCAPE' ? 'landscape' : 'portrait';
+    const value = await this.hub.get<unknown>(sessionId, '/orientation');
+    // Defensive: a hub that answers with something other than a string should
+    // not crash the test with a TypeError.
+    return String(value ?? '').toUpperCase() === 'LANDSCAPE' ? 'landscape' : 'portrait';
   }
 
   async setOrientation(orientation: Orientation): Promise<void> {
@@ -754,6 +765,19 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
       debug('lambda-name failed (%s), trying the REST API', (err as Error).message);
     }
     await this.rest?.updateSession(sessionId, { name }).catch(() => {});
+  }
+
+  /**
+   * Replaces each labelled verb with one that stamps its name on every hub
+   * command it raises. Done once per instance rather than by hand per method,
+   * so a verb added later cannot be silently forgotten.
+   */
+  private labelVerbs(): void {
+    const self = this as unknown as Record<string, (...args: never[]) => Promise<unknown>>;
+    for (const verb of LABELLED_VERBS) {
+      const original = self[verb].bind(self);
+      self[verb] = (...args: never[]) => this.stepped(verb, () => original(...args));
+    }
   }
 
   /** Test seam: the capabilities this driver would send for a given allocation. */

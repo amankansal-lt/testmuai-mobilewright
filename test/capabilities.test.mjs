@@ -67,7 +67,11 @@ test('device name patterns become TestMu.Ai regexes, literals pass through', () 
 test('osVersion ranges translate to a major-version alternation', () => {
   assert.equal(toTestMuPlatformVersion('17.2'), '17.2');
   assert.equal(toTestMuPlatformVersion('17'), '17');
-  assert.equal(toTestMuPlatformVersion('>=17 <19'), '(17.*),(18.*),(19.*)');
+  // an exclusive bound on a whole major excludes that major entirely
+  assert.equal(toTestMuPlatformVersion('>=17 <19'), '(17.*),(18.*)');
+  assert.equal(toTestMuPlatformVersion('>=17 <=19'), '(17.*),(18.*),(19.*)');
+  // ...but an exclusive bound with minors keeps it, since 19.0-19.4 qualify
+  assert.ok(toTestMuPlatformVersion('<19.5').endsWith('(19.*)'));
   assert.equal(toTestMuPlatformVersion(undefined), undefined);
 });
 

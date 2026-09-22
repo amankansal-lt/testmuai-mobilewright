@@ -65,9 +65,15 @@ export function toTestMuPlatformVersion(osVersion: string | undefined): string |
   if (min === undefined && max === undefined) return undefined;
 
   const lower = min ?? Math.max(0, (max ?? 0) - 6);
-  // An exclusive upper bound still admits that major version's earlier minors
-  // (">=17 <19" wants 17.x and 18.x), so only drop it when it is an exact major.
-  const upper = max === undefined ? lower + 6 : (range.max?.inclusive ? max : max);
+  // An exclusive bound on a whole major excludes that major entirely
+  // (">=17 <19" admits 17.x and 18.x, never 19.x). An exclusive bound with
+  // minors still admits the earlier minors of that major ("<19.5" admits
+  // 19.0-19.4), so the major is kept — slightly over-inclusive, which is the
+  // safe direction for device matching.
+  const excludesWholeMajor = range.max !== undefined &&
+    !range.max.inclusive &&
+    /^\d+(\.0+)*$/.test(range.max.version);
+  const upper = max === undefined ? lower + 6 : (excludesWholeMajor ? max - 1 : max);
   const majors: string[] = [];
   for (let v = lower; v <= upper && majors.length < 12; v++) majors.push(`${v}.*`);
   if (majors.length === 0) return undefined;
