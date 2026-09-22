@@ -9,7 +9,7 @@ import {
 } from '../dist/capabilities.js';
 
 const creds = { username: 'user', accessKey: 'key' };
-const lt = (criteria, options = {}, apps = []) => buildCapabilities(criteria, options, apps, creds).alwaysMatch;
+const lt = (criteria, options = {}, apps = ['lt://APP1']) => buildCapabilities(criteria, options, apps, creds).alwaysMatch;
 
 test('platform is required', () => {
   assert.throws(() => lt({}), /platform \("ios" or "android"\) is required/);
@@ -32,6 +32,12 @@ test('sessions are labelled with the mobilewright framework type', () => {
   assert.equal(lt({ platform: 'ios' }).frameworkType, 'mobilewright');
   // still overridable through the escape hatch
   assert.equal(lt({ platform: 'ios' }, { ltOptions: { frameworkType: 'appium' } }).frameworkType, 'appium');
+});
+
+test('a session without an app fails fast rather than allocating as web automation', () => {
+  assert.throws(() => buildCapabilities({ platform: 'ios' }, {}, [], creds), /must start with an app/);
+  // an app supplied through the escape hatch is accepted
+  assert.doesNotThrow(() => buildCapabilities({ platform: 'ios' }, { capabilities: { app: 'lt://X' } }, [], creds));
 });
 
 test('LambdaTest log capabilities use their documented spelling', () => {

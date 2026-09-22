@@ -130,6 +130,17 @@ export function buildCapabilities(
     ...(app ? { app } : {}),
   };
 
+  // LambdaTest derives isAppAutomate from the presence of `app`, and that flag
+  // decides the sub-test type used for device allocation. Without an app the
+  // session is allocated as web automation and fails confusingly downstream.
+  const escapeHatchApp = options.capabilities?.['app'] ?? options.ltOptions?.['app'] ?? options.capabilities?.['browserName'];
+  if (!app && !escapeHatchApp) {
+    throw new LambdaTestDriverError(
+      'A LambdaTest session must start with an app. Set the driver\'s `app` option ' +
+      '(an lt://APP_ID, a local .apk/.ipa path, or an https url), or a per-platform `apps` entry.',
+    );
+  }
+
   // LambdaTest caps otherApps at 3 and rejects duplicates of the main app.
   if (otherApps.length) {
     const extras = [...new Set(otherApps)].filter((ref) => ref !== app);

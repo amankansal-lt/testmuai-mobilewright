@@ -753,8 +753,8 @@ export class LambdaTestDriver implements MobilewrightSession, DeviceAllocator {
   }
 
   /** Test seam: the capabilities this driver would send for a given allocation. */
-  buildCapabilitiesForTest(criteria: AllocationCriteria): Record<string, unknown> {
-    return buildCapabilities(criteria, this.optionsWithDefaults(), [], this.credentials, {
+  buildCapabilitiesForTest(criteria: AllocationCriteria, appRefs: string[] = ['lt://TEST']): Record<string, unknown> {
+    return buildCapabilities(criteria, this.optionsWithDefaults(), appRefs, this.credentials, {
       style: this.isLambdaTestHub ? 'lambdatest' : 'w3c',
     }).alwaysMatch;
   }
