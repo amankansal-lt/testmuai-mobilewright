@@ -1,7 +1,7 @@
 {
   "name": "@lambdatest/mobilewright",
   "version": "0.1.0",
-  "description": "LambdaTest driver for Mobilewright \u2014 run Mobilewright tests on LambdaTest real devices",
+  "description": "LambdaTest driver for Mobilewright — run Mobilewright tests on LambdaTest real devices",
   "main": "./dist/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -20,7 +20,8 @@
   "license": "Apache-2.0",
   "type": "module",
   "devDependencies": {
-    "@mobilewright/protocol": "^0.0.59",
+    "@mobilewright/core": "^0.0.60",
+    "@mobilewright/protocol": "^0.0.60",
     "@types/debug": "^4.1.13",
     "@types/node": "^26.6.2",
     "typescript": "^7.0.2"
@@ -31,5 +32,13 @@
   "files": [
     "dist",
     "README.md"
-  ]
+  ],
+  "peerDependencies": {
+    "@mobilewright/protocol": ">=0.0.53 <0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@mobilewright/protocol": {
+      "optional": false
+    }
+  }
 }
