@@ -127,7 +127,11 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
     this.hub = new WebDriverClient(
       options.hubUrl ?? DEFAULT_HUB_URL,
       options.commandTimeout,
-      () => (this.step && options.stepHeader !== false ? { [STEP_HEADER]: this.step } : undefined),
+      // Only a TestMu hub gets the step label: it is honoured server-side by the
+      // frameworkType capability, which only the TestMu capability style sends.
+      () => (this.step && this.isTestMuHub && options.stepHeader !== false
+        ? { [STEP_HEADER]: this.step }
+        : undefined),
     );
     this.keepalive = new Keepalive(this.hub);
     this.labelVerbs();

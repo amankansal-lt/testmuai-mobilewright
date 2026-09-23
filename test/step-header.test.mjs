@@ -46,22 +46,45 @@ async function startHub() {
 
 test('each command is labelled with the Mobilewright verb behind it', async () => {
   const hub = await startHub();
+  // capabilityStyle pins this as a TestMu.Ai hub: the step label is only sent
+  // where the frameworkType capability that authorises it server-side is sent.
+  const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}`, capabilityStyle: 'testmu' });
+
+  try {
+    await driver.connect({ platform: 'ios', deviceId: SESSION_ID });
+    await driver.getViewHierarchy();
+    await driver.tap(10, 20);
+
+    const source = hub.seen.find((r) => r.path.endsWith('/source'));
+    const actions = hub.seen.find((r) => r.path.endsWith('/actions'));
+    assert.equal(source.step, 'getViewHierarchy');
+    assert.equal(actions.step, 'tap');
+
+    // Commands raised outside a labelled verb carry no header rather than a stale one.
+    const settings = hub.seen.find((r) => r.path.endsWith('/appium/settings'));
+    assert.equal(settings.step, undefined);
+  } finally {
+    await driver.dispose();
+    await hub.close();
+  }
+});
+
+test('a plain Appium hub gets no step header, since it gets no frameworkType', async () => {
+  const hub = await startHub();
+  // A bare host is not a TestMu.Ai hub, so capabilities go out in w3c style
+  // without frameworkType — and the label that depends on it is withheld too.
   const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
 
-  await driver.connect({ platform: 'ios', deviceId: SESSION_ID });
-  await driver.getViewHierarchy();
-  await driver.tap(10, 20);
+  try {
+    await driver.connect({ platform: 'ios', deviceId: SESSION_ID });
+    await driver.getViewHierarchy();
 
-  const source = hub.seen.find((r) => r.path.endsWith('/source'));
-  const actions = hub.seen.find((r) => r.path.endsWith('/actions'));
-  assert.equal(source.step, 'getViewHierarchy');
-  assert.equal(actions.step, 'tap');
-
-  // Commands raised outside a labelled verb carry no header rather than a stale one.
-  const settings = hub.seen.find((r) => r.path.endsWith('/appium/settings'));
-  assert.equal(settings.step, undefined);
-
-  await hub.close();
+    const source = hub.seen.find((r) => r.path.endsWith('/source'));
+    assert.equal(source.step, undefined, 'no vendor header should reach a non-TestMu hub');
+  } finally {
+    await driver.dispose();
+    await hub.close();
+  }
 });
 
 test('snapshot tuning is applied on connect and can be disabled', async () => {
@@ -137,31 +160,36 @@ test('devcluster hubs are recognised as TestMu.Ai hubs', async () => {
 
 test('every verb that issues hub commands labels them', async () => {
   const hub = await startHub();
-  const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
-  await driver.connect({ platform: 'ios', deviceId: SESSION_ID });
-
-  // a representative spread, including verbs that call other verbs internally
-  await driver.getViewHierarchy();
-  await driver.tap(1, 2);
-  await driver.doubleTap(1, 2);
-  await driver.pressKeys(['enter']);
-  await driver.getOrientation();
-  await driver.launchApp('com.example.app');
-  await driver.openUrl('https://example.com');
-
-  const steps = new Set(hub.seen.map((r) => r.step).filter(Boolean));
-  for (const verb of ['getViewHierarchy', 'tap', 'doubleTap', 'pressKeys', 'getOrientation', 'launchApp', 'openUrl']) {
-    assert.ok(steps.has(verb), `no command was labelled "${verb}" (saw: ${[...steps].join(', ')})`);
-  }
-
-  // a verb that calls another verb reports the innermost one, then restores
+  const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}`, capabilityStyle: 'testmu' });
   const swipeHub = await startHub();
-  const d2 = new TestMuDriver({ hubUrl: `http://127.0.0.1:${swipeHub.port}` });
-  await d2.connect({ platform: 'ios', deviceId: SESSION_ID });
-  await d2.swipe('up');
-  const actions = swipeHub.seen.filter((r) => r.path.endsWith('/actions'));
-  assert.equal(actions.at(-1).step, 'swipe', 'the swipe action itself must be labelled swipe, not getScreenSize');
+  const d2 = new TestMuDriver({ hubUrl: `http://127.0.0.1:${swipeHub.port}`, capabilityStyle: 'testmu' });
 
-  await hub.close();
-  await swipeHub.close();
+  try {
+    await driver.connect({ platform: 'ios', deviceId: SESSION_ID });
+
+    // a representative spread, including verbs that call other verbs internally
+    await driver.getViewHierarchy();
+    await driver.tap(1, 2);
+    await driver.doubleTap(1, 2);
+    await driver.pressKeys(['enter']);
+    await driver.getOrientation();
+    await driver.launchApp('com.example.app');
+    await driver.openUrl('https://example.com');
+
+    const steps = new Set(hub.seen.map((r) => r.step).filter(Boolean));
+    for (const verb of ['getViewHierarchy', 'tap', 'doubleTap', 'pressKeys', 'getOrientation', 'launchApp', 'openUrl']) {
+      assert.ok(steps.has(verb), `no command was labelled "${verb}" (saw: ${[...steps].join(', ')})`);
+    }
+
+    // a verb that calls another verb reports the innermost one, then restores
+    await d2.connect({ platform: 'ios', deviceId: SESSION_ID });
+    await d2.swipe('up');
+    const actions = swipeHub.seen.filter((r) => r.path.endsWith('/actions'));
+    assert.equal(actions.at(-1).step, 'swipe', 'the swipe action itself must be labelled swipe, not getScreenSize');
+  } finally {
+    await driver.dispose();
+    await d2.dispose();
+    await hub.close();
+    await swipeHub.close();
+  }
 });
