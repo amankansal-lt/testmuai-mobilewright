@@ -127,8 +127,7 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
     this.hub = new WebDriverClient(
       options.hubUrl ?? DEFAULT_HUB_URL,
       options.commandTimeout,
-      // Only a TestMu hub gets the step label: it is honoured server-side by the
-      // frameworkType capability, which only the TestMu capability style sends.
+      // Only a TestMu hub gets the step label: it is honoured server-side by the frameworkType capability, which only that style sends.
       () => (this.step && this.isTestMuHub && options.stepHeader !== false
         ? { [STEP_HEADER]: this.step }
         : undefined),
@@ -250,13 +249,11 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   async release(deviceId: string): Promise<void> {
     this.keepalive.stop(deviceId);
     this.allocatedSessions.delete(deviceId);
-    // A session this instance is driving is now gone; drop the handle so a
-    // later verb fails with "no active session" instead of "invalid session id".
+    // Drop the handle so a later verb fails with "no active session" rather than "invalid session id".
     if (this.session?.sessionId === deviceId) {
       this.session = null;
     }
-    // Verdicts are pushed per session by the observer at run end, from the run
-    // report. Pushing here would stamp one worker's outcome on every session.
+    // Verdicts are pushed per session by the observer at run end; pushing here would stamp one worker's outcome on every session.
     try {
       await this.hub.deleteSession(deviceId);
     } catch (err) {
@@ -439,9 +436,7 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
       await this.hub.performActions(sessionId, [typeTextActions(''.repeat(current))]);
       return;
     }
-    // No focused element and nothing to count: the select-all chord is the last
-    // resort. Returning silently here would let fill() append to existing text
-    // while reporting success.
+    // Last resort: returning silently would let fill() append to existing text while reporting success.
     debug('clearText: no focused element; falling back to the select-all chord');
     await this.pressKeys([platform === 'ios' ? 'cmd+a' : 'ctrl+a', 'backspace']);
   }
@@ -551,9 +546,7 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   }
 
   async getScreenSize(): Promise<ScreenSize> {
-    // Native context matters: inside a webview /window/rect returns the page
-    // viewport, and caching that would corrupt every later swipe coordinate
-    // and screenshot crop for the rest of the session.
+    // Native context matters: inside a webview /window/rect returns the page viewport, which would corrupt every later swipe and crop.
     const session = await this.nativeSession();
     if (session.screenSize) return session.screenSize;
 
@@ -685,8 +678,7 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   async openUrl(url: string): Promise<void> {
     const { sessionId, platform, lastLaunchedBundleId } = await this.nativeSession();
     if (!lastLaunchedBundleId) {
-      // `mobile: deepLink` requires the target app; before the first launchApp
-      // we do not know it, and W3C /url opens a deep link without one.
+      // `mobile: deepLink` requires the target app; before the first launchApp we do not know it, and W3C /url needs no bundle.
       await this.hub.post(sessionId, '/url', { url });
       return;
     }

@@ -14,8 +14,7 @@ const NAMED_ENTITIES: Record<string, string> = {
 };
 
 function codePoint(value: number): string | undefined {
-  // An app can render an out-of-range numeric entity; fromCodePoint throws on
-  // one, which would otherwise escape parseSourceXml and fail every poll.
+  // An app can render an out-of-range numeric entity; fromCodePoint throws on one, which would fail every hierarchy poll.
   if (!Number.isInteger(value) || value < 0 || value > 0x10ffff) return undefined;
   try {
     return String.fromCodePoint(value);
@@ -157,9 +156,7 @@ export function parseSourceXml(xml: string, platform: Platform, visibility: Visi
     ? (tag: string, attrs: Record<string, string>) => androidNode(tag, attrs)
     : (tag: string, attrs: Record<string, string>) => iosNode(tag, attrs, visibility);
 
-  // Comments and CDATA can contain tag-shaped text. Without stripping them a
-  // commented-out element becomes a real ViewNode with real bounds, which a
-  // locator can match and tap — an element that is not on screen at all.
+  // Comments and CDATA contain tag-shaped text; without stripping, a commented-out element becomes a real, tappable ViewNode.
   const scannable = xml
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '');

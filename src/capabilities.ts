@@ -64,9 +64,7 @@ export function toTestMuPlatformVersion(osVersion: string | undefined): string |
   const max = range.max ? Math.floor(Number(range.max.version)) : undefined;
   if (min === undefined && max === undefined) return undefined;
 
-  // A half-open range has to be approximated as a finite list of majors. The
-  // window is generous on purpose: too narrow silently excludes a current OS
-  // (">=17" must still admit iOS 26), and over-inclusion only widens matching.
+  // A half-open range becomes a finite list of majors; the window is generous on purpose, since over-inclusion only widens matching.
   const WINDOW = 11;
   const lower = min ?? Math.max(0, (max ?? 0) - WINDOW);
   // An exclusive bound on a whole major excludes that major entirely

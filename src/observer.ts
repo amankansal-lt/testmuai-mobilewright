@@ -112,8 +112,7 @@ export class TestMuObserver implements TestObserver {
       return;
     }
 
-    // No report, or no device.id annotations in it: fall back to the run's own
-    // verdict on whatever sessions are still open. Coarser, but never silent.
+    // No report or no device.id annotations: fall back to the run verdict on still-open sessions. Coarser, but never silent.
     const live = this.sink.liveSessionIds();
     if (live.length === 0) {
       debug('no session records and no live sessions — nothing to report');

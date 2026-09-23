@@ -46,8 +46,7 @@ async function startHub() {
 
 test('each command is labelled with the Mobilewright verb behind it', async () => {
   const hub = await startHub();
-  // capabilityStyle pins this as a TestMu.Ai hub: the step label is only sent
-  // where the frameworkType capability that authorises it server-side is sent.
+  // capabilityStyle pins this as a TestMu.Ai hub: the step label goes only where the frameworkType capability that authorises it goes.
   const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}`, capabilityStyle: 'testmu' });
 
   try {
@@ -71,8 +70,7 @@ test('each command is labelled with the Mobilewright verb behind it', async () =
 
 test('a plain Appium hub gets no step header, since it gets no frameworkType', async () => {
   const hub = await startHub();
-  // A bare host is not a TestMu.Ai hub, so capabilities go out in w3c style
-  // without frameworkType — and the label that depends on it is withheld too.
+  // A bare host is not a TestMu.Ai hub, so caps go out in w3c style without frameworkType — and the label depending on it is withheld.
   const driver = new TestMuDriver({ hubUrl: `http://127.0.0.1:${hub.port}` });
 
   try {
