@@ -35,7 +35,6 @@ export class WebDriverClient {
      * `GET /source` and `POST /actions` and cannot tell which framework call
      * produced them.
      */
-    private readonly extraHeaders?: () => Record<string, string> | undefined,
   ) {}
 
   async newSession(capabilities: unknown, timeoutMs?: number): Promise<{ sessionId: string; capabilities: Record<string, unknown> }> {
@@ -108,7 +107,7 @@ export class WebDriverClient {
     try {
       response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json; charset=utf-8', ...this.extraHeaders?.() },
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
         signal: AbortSignal.timeout(timeoutMs),
       });

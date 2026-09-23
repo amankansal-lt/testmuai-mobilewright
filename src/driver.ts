@@ -54,23 +54,8 @@ const DEFAULT_ALLOCATION_TIMEOUT = 900_000;
 const DEFAULT_IDLE_TIMEOUT = 900;
 const DEFAULT_SNAPSHOT_TUNING: SnapshotTuning = { waitForIdleTimeout: 0, animationCoolOffTimeout: 0 };
 
-/**
- * Every driver verb that issues hub commands. Each is wrapped so the commands
- * it raises carry the verb's name, which is what makes a command log readable
- * as framework calls instead of raw `GET /source` traffic.
- */
-const LABELLED_VERBS = [
-  'getViewHierarchy', 'tap', 'doubleTap', 'longPress', 'typeText', 'pressKeys',
-  'clearText', 'swipe', 'gesture', 'pressButton', 'screenshot', 'getScreenSize',
-  'getOrientation', 'setOrientation', 'setGeolocation', 'launchApp', 'terminateApp',
-  'listApps', 'getForegroundApp', 'installApp', 'uninstallApp', 'openUrl',
-] as const;
-
 /** Identifies a TestMu.Ai hub by service name, without naming any environment. */
 const HUB_HOSTNAME = /(^|[/.])mobile-hub[-.]/i;
-
-/** Labels each WebDriver command with the Mobilewright verb behind it. */
-const STEP_HEADER = 'X-LT-Framework-Step';
 
 // TestMu.Ai session ids are long hex/uuid-ish strings; a catalog device name never is.
 const SESSION_ID_RE = /^[0-9a-f][0-9a-f-]{19,}$/i;
@@ -117,7 +102,6 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
   private readonly allocatedSessions = new Set<string>();
   private readonly appCache = new Map<string, Promise<string>>();
   private session: ActiveSession | null = null;
-  private step: string | undefined;
   private api: TestMuApi | undefined;
   private planConcurrency: number | undefined;
   private concurrencyWarned = false;
@@ -127,13 +111,8 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
     this.hub = new WebDriverClient(
       options.hubUrl ?? DEFAULT_HUB_URL,
       options.commandTimeout,
-      // Only a TestMu hub gets the step label: it is honoured server-side by the frameworkType capability, which only that style sends.
-      () => (this.step && this.isTestMuHub && options.stepHeader !== false
-        ? { [STEP_HEADER]: this.step }
-        : undefined),
     );
     this.keepalive = new Keepalive(this.hub);
-    this.labelVerbs();
     this.observer = options.testResults === false
       ? undefined
       : new TestMuObserver(
@@ -348,21 +327,6 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
     const { sessionId, platform } = await this.nativeSession();
     const xml = await this.hub.source(sessionId);
     return parseSourceXml(xml, platform, this.options.visibility ?? 'native');
-  }
-
-  /**
-   * Labels every hub command raised inside `fn` with the verb that caused it.
-   * The hub only ever sees `GET /source` and `POST /actions`; without this it
-   * cannot tell that one locator tap produced three of them.
-   */
-  private async stepped<T>(name: string, fn: () => Promise<T>): Promise<T> {
-    const previous = this.step;
-    this.step = name;
-    try {
-      return await fn();
-    } finally {
-      this.step = previous;
-    }
   }
 
   // ─── Input ──────────────────────────────────────────────────
@@ -781,19 +745,6 @@ export class TestMuDriver implements MobilewrightSession, DeviceAllocator {
       debug('lambda-name failed (%s), trying the REST API', (err as Error).message);
     }
     await this.rest?.updateSession(sessionId, { name }).catch(() => {});
-  }
-
-  /**
-   * Replaces each labelled verb with one that stamps its name on every hub
-   * command it raises. Done once per instance rather than by hand per method,
-   * so a verb added later cannot be silently forgotten.
-   */
-  private labelVerbs(): void {
-    const self = this as unknown as Record<string, (...args: never[]) => Promise<unknown>>;
-    for (const verb of LABELLED_VERBS) {
-      const original = self[verb].bind(self);
-      self[verb] = (...args: never[]) => this.stepped(verb, () => original(...args));
-    }
   }
 
   /** Test seam: the capabilities this driver would send for a given allocation. */

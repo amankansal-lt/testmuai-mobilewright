@@ -91,13 +91,6 @@ export interface TestMuDriverOptions {
   visibility?: 'native' | 'bounds';
 
   /**
-   * Send the X-LT-Framework-Step header naming the Mobilewright verb behind
-   * each WebDriver command, so the dashboard's command log can be read as
-   * framework calls rather than raw `GET /source` traffic. Default: true.
-   */
-  stepHeader?: boolean;
-
-  /**
    * Force the capability style instead of inferring it from `hubUrl`.
    * 'testmu' sends TestMu.Ai's flat capabilities; 'w3c' sends prefixed
    * vendor capabilities for a plain Appium server.
