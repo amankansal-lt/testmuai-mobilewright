@@ -55,7 +55,7 @@ const DEFAULT_IDLE_TIMEOUT = 900;
 const DEFAULT_SNAPSHOT_TUNING: SnapshotTuning = { waitForIdleTimeout: 0, animationCoolOffTimeout: 0 };
 
 /** Identifies a TestMu.Ai hub by service name, without naming any environment. */
-const HUB_HOSTNAME = /(^|[/.])mobile-hub[-.]/i;
+const HUB_HOSTNAME = /mobile-hub[-.]/i;
 
 // TestMu.Ai session ids are long hex/uuid-ish strings; a catalog device name never is.
 const SESSION_ID_RE = /^[0-9a-f][0-9a-f-]{19,}$/i;
